@@ -1,3 +1,5 @@
+// src/types.ts
+
 export interface Cat {
   id: string;
   name: string;
@@ -5,97 +7,97 @@ export interface Cat {
   skinId: string;
   level: number;
   xp: number;
-  hunger: number; // 0 - 100
-  happiness: number; // 0 - 100
-  cleanliness: number; // 0 - 100
-  energy: number; // 0 - 100
-  status: 'idle' | 'eating' | 'sleeping' | 'playing' | 'bathing' | 'grooming';
-  lastInteraction: number;
+  hunger: number;      // 0-100
+  happiness: number;   // 0-100
+  cleanliness: number; // 0-100
+  energy: number;      // 0-100
+  status: 'idle' | 'eating' | 'playing' | 'sleeping' | 'bathing';
+  personality: 'lazy' | 'playful' | 'hungry';
+  // accessory теперь хранится отдельно? Лучше добавить поле для аксессуара, если не используется skinId.
+  // Используем accessory как строку.
   accessory?: string;
-  personality?: 'lazy' | 'playful' | 'hungry';
+  // Дополнительно можно хранить время последнего взаимодействия
+  lastInteraction?: number;
 }
 
 export interface Skin {
   id: string;
   name: string;
   description: string;
-  cost: number;
-  breed: string;
+  breed: string;       // для какой породы
   color: string;
   patternColor: string;
   eyeColor: string;
-  accessory?: string;
+  cost: number;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  accessory?: string;  // если это аксессуар, содержит его идентификатор
 }
 
 export interface DailyQuest {
   id: string;
   text: string;
-  progress: number;
   target: number;
+  progress: number;
   completed: boolean;
   claimed: boolean;
   rewardPaws: number;
-  type: 'feed' | 'play' | 'clean' | 'sleep' | 'earn_paws' | 'click' | 'antistress';
-}
-
-export interface PlayerProfile {
-  nickname: string;
-  avatar: string; // Эмодзи или имя аватара
-  paws: number;
-  streak: number;
-  lastActiveDay: string; // ГГГГ-ММ-ДД
-  theme: 'light' | 'dark' | 'auto';
-  soundEnabled: boolean;
-  cats: Cat[];
-  activeCatId: string;
-  unlockedSkins: string[]; // ID разблокированных скинов
-  unlockedBreeds: string[]; // ID разблокированных пород
-  quests: DailyQuest[];
-  totalPlayTime: number; // в секундах
-  totalInteractions: number;
-  createdAt: string;
-  
-  // Новые поля для обновления
-  claimedReviewReward?: boolean; // Получил ли награду за отзыв (+100 лапок)
-  currentWallpaper?: string;     // Текущие обои (ventura, sonoma, sequoia, cosmic, pastel, aurora)
-  unlockedAchievements?: string[]; // Разблокированные достижения
-  clicksCount?: number;           // Сколько раз погладили котика
-  popItBurstedCount?: number;     // Лопнутые пузыри
-  keyboardClicksCount?: number;   // Клики по клавиатуре
-  redeemedPromos?: string[];      // Активированные промокоды
-  lastPromoRedeemedTime?: number; // Время последней активации промокода
-  diary?: DiaryEntry[];           // Дневник важных событий из жизни кота
-}
-
-export interface DiaryEntry {
-  id: string;
-  catId: string;
-  timestamp: number;
-  type: 'adopt' | 'level_up' | 'skin_unlocked' | 'rare_catch' | 'achievement' | 'groom';
-  title: string;
-  description: string;
-  icon: string;
 }
 
 export interface NotificationItem {
   id: string;
+  type: 'info' | 'success' | 'warning' | 'paw';
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'paw';
   timestamp: number;
 }
 
 export interface GameAnalytics {
-  pawsSpent: number;
-  skinsBought: number;
-  levelUps: number;
+  totalPawsEarned: number;
+  totalPawsSpent: number;
+  totalInteractions: number;
+  retentionScore: number;
   actionsPerformed: {
     feed: number;
     play: number;
     clean: number;
     sleep: number;
   };
-  retentionScore: number; // симулированный расчет
-  sessionDuration: number; // секунды
+  pawsSpent: number;
+}
+
+export interface DiaryEntry {
+  id: string;
+  catId: string;
+  timestamp: number;
+  type: 'adopt' | 'level_up' | 'skin_unlocked' | 'rare_catch' | 'achievement';
+  title: string;
+  description: string;
+  icon: string;
+}
+
+export interface PlayerProfile {
+  id?: string;
+  nickname: string;
+  paws: number;
+  cats: Cat[];
+  activeCatId: string;
+  unlockedSkins: string[]; // массив id скинов
+  quests: DailyQuest[];
+  unlockedAchievements?: string[];
+  totalPlayTime: number;
+  totalInteractions: number;
+  clicksCount?: number;
+  popItBurstedCount?: number;
+  keyboardClicksCount?: number;
+  diary?: DiaryEntry[];
+  theme: 'light' | 'dark' | 'auto';
+  currentWallpaper: string;
+  soundEnabled: boolean;
+  streak: number;
+  claimedReviewReward: boolean;
+  isAdmin?: boolean;
+  blocked?: boolean;
+  // Новые поля для инвентаря
+  foodCount: number;
+  soapCount: number;
 }

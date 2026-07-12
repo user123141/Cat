@@ -12,18 +12,18 @@ interface ShopWindowProps {
   allSkins: Skin[];
   onPurchase: (skinId: string) => void;
   onApply: (catId: string, skinId: string) => void;
-  onDonatePaws: (amount: number) => void; // Новая функция для доната
+  onDonatePaws: (amount: number) => void;
   onClose: () => void;
   onMinimize: () => void;
   onRedeemPromo?: (code: string) => { success: boolean; message: string };
 }
 
 const DONATION_PACKS = [
-  { id: 'pack_100', paws: 100, priceUah: 49, desc: 'Начальный набор лапок для мелких покупок.', badge: 'Популярно ⭐️', icon: '🪙' },
+  { id: 'pack_100', paws: 100, priceUah: 49, desc: 'Начальный набор лапок для мелких покупок.', badge: 'Популярно', icon: '🪙' },
   { id: 'pack_300', paws: 300, priceUah: 129, desc: 'Хороший старт. Хватит на пару крутых очков!', badge: 'Выгода 12%', icon: '🎒' },
-  { id: 'pack_500', paws: 500, priceUah: 199, desc: 'Золотой стандарт. Отличный баланс цены и объема.', badge: 'Рекомендовано 🔥', icon: '💼' },
-  { id: 'pack_1200', paws: 1200, priceUah: 399, desc: 'Премиум кошелек. Нарядите всех котиков!', badge: 'Скидка 20% ✨', icon: '🏺' },
-  { id: 'pack_3000', paws: 3000, priceUah: 799, desc: 'Кошачий олигарх! Разблокируйте вообще всё.', badge: 'Скидка 33% 👑', icon: '🏦' },
+  { id: 'pack_500', paws: 500, priceUah: 199, desc: 'Золотой стандарт. Отличный баланс цены и объема.', badge: 'Рекомендовано', icon: '💼' },
+  { id: 'pack_1200', paws: 1200, priceUah: 399, desc: 'Премиум кошелек. Нарядите всех котиков!', badge: 'Скидка 20%', icon: '🏺' },
+  { id: 'pack_3000', paws: 3000, priceUah: 799, desc: 'Кошачий олигарх! Разблокируйте вообще всё.', badge: 'Скидка 33%', icon: '🏦' },
 ];
 
 export const ShopWindow: React.FC<ShopWindowProps> = ({
@@ -40,21 +40,18 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
   const [activeTab, setActiveTab] = useState<'skins' | 'accessories' | 'topup'>('skins');
   const [selectedSkinId, setSelectedSkinId] = useState<string>(allSkins[0].id);
 
-  // Для процесса оплаты MaksyPAY
   const [checkoutPack, setCheckoutPack] = useState<typeof DONATION_PACKS[0] | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'maccat_pay_sheet' | 'processing' | 'success'>('idle');
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
-  const [promoDiscount, setPromoDiscount] = useState<number>(0); // 0 to 1 for multiplier discount
+  const [promoDiscount, setPromoDiscount] = useState<number>(0);
   const [promoError, setPromoError] = useState('');
 
-  // Интерактивные данные карты
   const [isEditingCard, setIsEditingCard] = useState(false);
   const [cardNumber, setCardNumber] = useState('7777 7777 7777 7777');
   const [cardHolder, setCardHolder] = useState('Maksym Skorina Signature');
   const [cardExpiry, setCardExpiry] = useState('12/30');
 
-  // Чек транзакции
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<{
     id: string;
@@ -80,7 +77,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
     const diffX = e.changedTouches[0].clientX - touchStartX.current;
     const diffY = e.changedTouches[0].clientY - touchStartY.current;
     
-    // Swipe down to minimize
     if (diffY > 100 && Math.abs(diffX) < 60) {
       onMinimize();
     }
@@ -121,12 +117,10 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
     }
   };
 
-  // Примерка
   const isAccessory = !!selectedSkin.accessory;
   const previewSkin = isAccessory ? activeCat.skinId : selectedSkin.id;
   const previewAccessory = isAccessory ? selectedSkin.accessory : (activeCat as any).accessory;
 
-  // Поиск цветов примерки
   const activeSkinColors = () => {
     const s = allSkins.find((item) => item.id === previewSkin);
     if (s) {
@@ -137,7 +131,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
 
   const colors = activeSkinColors();
 
-  // Запуск процесса доната
   const handleCheckoutStart = (pack: typeof DONATION_PACKS[0]) => {
     triggerHaptic();
     setCheckoutPack(pack);
@@ -161,13 +154,13 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
       if (res.success) {
         setAppliedPromo(cleanPromo);
         if (cleanPromo === 'ILOVEAMINA') {
-          setPromoDiscount(1.0); // 100% discount!
+          setPromoDiscount(1.0);
         } else if (cleanPromo === 'MAKSMINIMALISM') {
-          setPromoDiscount(0.5); // 50% discount
+          setPromoDiscount(0.5);
         } else if (cleanPromo === 'MAKSPAY') {
-          setPromoDiscount(0.3); // 30% discount
+          setPromoDiscount(0.3);
         } else {
-          setPromoDiscount(0.2); // General discount for other valid codes
+          setPromoDiscount(0.2);
         }
         setPromoError('');
       } else {
@@ -176,7 +169,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
         setPromoDiscount(0);
       }
     } else {
-      // Fallback
       if (cleanPromo === 'ILOVEAMINA') {
         setAppliedPromo('ILOVEAMINA');
         setPromoDiscount(1.0);
@@ -201,15 +193,12 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
     triggerHaptic();
     setPaymentStatus('processing');
 
-    // Симуляция безопасного шлюза оплаты MaksyPAY
     setTimeout(() => {
       setPaymentStatus('success');
       
       if (checkoutPack) {
-        // Award the paws immediately
         onDonatePaws(checkoutPack.paws);
 
-        // Freeze real-world transaction details with stable current date & time
         const transId = `MP-${Math.floor(100000 + Math.random() * 900000)}`;
         const now = new Date();
         const formattedDate = now.toLocaleDateString('ru-RU', {
@@ -253,10 +242,8 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
         </div>
       }
     >
-      {/* 2. Window Content Body */}
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
         
-        {/* Left Side: Live Preview Cabin (Only visible for customizations tabs) */}
         {activeTab !== 'topup' && (
           <div className="w-full lg:w-60 bg-black/25 border-b lg:border-b-0 lg:border-r border-white/5 p-4 flex flex-col items-center justify-center text-center shrink-0 max-lg:py-3">
             <span className="text-[9px] font-mono tracking-wider text-slate-400 uppercase mb-2 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
@@ -285,7 +272,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
               {selectedSkin.description}
             </p>
 
-            {/* Action button */}
             <div className="w-full mt-3">
               {profile.unlockedSkins.includes(selectedSkin.id) ? (
                 <button
@@ -318,9 +304,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
           </div>
         )}
 
-        {/* Right Side / Whole Side: Catalog Tabs and Grids */}
         <div className="flex-1 overflow-y-auto flex flex-col bg-slate-950/20 p-4 md:p-5">
-          {/* Tabs */}
           <div className="flex bg-black/40 border border-white/5 rounded-xl p-0.5 max-w-md self-center lg:self-start mb-4 text-[11px] font-bold">
             <button
               onClick={() => {
@@ -352,11 +336,10 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                 activeTab === 'topup' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <span>Пополнить 💎</span>
+              <span>Пополнить</span>
             </button>
           </div>
 
-          {/* Catalog Lists depending on activeTab */}
           {activeTab !== 'topup' ? (
             <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 pb-3">
               {filteredItems.map((item) => {
@@ -409,7 +392,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
               })}
             </div>
           ) : (
-            // TOP UP DONATION TAB
             <div className="flex-1 flex flex-col space-y-4">
               <div className="text-left bg-white/5 border border-white/5 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                 <div>
@@ -427,14 +409,12 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                 </div>
               </div>
 
-              {/* Grid of donation packs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pb-2">
                 {DONATION_PACKS.map((pack) => (
                   <div
                     key={pack.id}
                     className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 hover:border-white/10 flex flex-col justify-between transition-all relative h-[145px]"
                   >
-                    {/* Badge */}
                     <span className="absolute top-2.5 right-2.5 text-[8px] font-bold bg-amber-500/20 border border-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full uppercase">
                       {pack.badge}
                     </span>
@@ -465,7 +445,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
         </div>
       </div>
 
-      {/* CHECKOUT SIMULATION GATEWAY MODAL OVERLAY (MaksyPAY Apple-style) */}
       <AnimatePresence>
         {checkoutPack && paymentStatus !== 'idle' && (
           <motion.div
@@ -481,11 +460,9 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
               transition={{ type: 'spring', damping: 28, stiffness: 280 }}
               className="w-full max-w-[400px] bg-neutral-950 border border-white/10 rounded-[24px] sm:rounded-[32px] p-4 sm:p-5 text-center space-y-3 shadow-2xl relative backdrop-blur-2xl my-auto h-auto shrink-0"
             >
-              {/* Abstract decorative ambient blur inside the card */}
               <div className="absolute -top-12 -left-12 w-32 h-32 rounded-full bg-gradient-to-tr from-amber-500/10 to-rose-500/0 blur-2xl pointer-events-none" />
               <div className="absolute -bottom-12 -right-12 w-32 h-32 rounded-full bg-gradient-to-tr from-sky-500/10 to-indigo-500/0 blur-2xl pointer-events-none" />
 
-              {/* Close Button */}
               {paymentStatus !== 'processing' && paymentStatus !== 'success' && (
                 <button
                   onClick={() => { triggerHaptic(); setCheckoutPack(null); setPaymentStatus('idle'); }}
@@ -495,7 +472,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                 </button>
               )}
 
-              {/* Header with MaksyPAY branding */}
               <div className="space-y-1">
                 <div className="flex items-center justify-center gap-1.5">
                   <span className="text-xl font-black tracking-tight text-white font-sans flex items-center gap-1">
@@ -509,7 +485,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
 
               {paymentStatus === 'maccat_pay_sheet' && (
                 <div className="space-y-4 text-left">
-                  {/* Apple Card Look-alike (Glassmorphism / Customizable) */}
                   <div className="relative h-38 rounded-2xl bg-gradient-to-tr from-zinc-900 via-neutral-900 to-zinc-950 border border-white/10 p-3 flex flex-col justify-between overflow-hidden shadow-xl">
                     <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-amber-400/10 via-rose-400/5 to-transparent rounded-full blur-2xl pointer-events-none" />
                     
@@ -578,7 +553,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                     </div>
                   </div>
 
-                  {/* Order Details Sheet (iOS/macOS Style Rows) */}
                   <div className="bg-white/5 border border-white/5 rounded-2xl p-3 sm:p-4 space-y-2 text-xs">
                     <div className="flex justify-between items-center py-1">
                       <span className="text-slate-400 font-medium">ТОВАР</span>
@@ -633,7 +607,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                     </div>
                   </div>
 
-                  {/* Promo code field with touch target optimized */}
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-bold text-slate-400 tracking-wide uppercase font-mono">
                       Промокод (попробуйте <span className="text-amber-400 font-extrabold">ILOVEAMINA</span>)
@@ -663,7 +636,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                     )}
                   </div>
 
-                  {/* Pay Action button (Optimized touch size 48px) */}
                   <button
                     onClick={confirmPayment}
                     className="w-full h-12 rounded-2xl bg-white text-black hover:bg-slate-100 font-bold text-xs tracking-wide transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 shadow-lg mt-2"
@@ -732,7 +704,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
         )}
       </AnimatePresence>
 
-      {/* DEDICATED VIEW RECEIPT MODAL */}
       <AnimatePresence>
         {showReceiptModal && receiptData && (
           <motion.div
@@ -756,9 +727,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                 <p className="text-[9px] text-slate-400">Транзакция успешно обработана через MaksyPAY</p>
               </div>
 
-              {/* Serrated Receipt Paper */}
               <div className="relative bg-white text-slate-900 p-5 rounded-2xl shadow-xl font-mono text-left text-xs border border-slate-200 overflow-hidden w-full">
-                {/* Top Serrated Edges */}
                 <div className="absolute top-0 left-0 right-0 h-2 bg-transparent flex justify-between overflow-hidden">
                   {Array.from({ length: 16 }).map((_, i) => (
                     <div key={i} className="w-3.5 h-3.5 bg-zinc-950 rounded-full shrink-0 -translate-y-2" />
@@ -783,10 +752,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                       <span>ПОСТАВЩИК:</span>
                       <span>MaksyPay-ShelterOS</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>УСТРОЙСТВО:</span>
-                      <span>MacBook Pro / iPhone TouchID</span>
-                    </div>
+                    {/* Убрана строка "УСТРОЙСТВО" */}
                     <div className="flex justify-between">
                       <span>КАРТА:</span>
                       <span className="truncate max-w-[150px] font-mono text-slate-900 font-bold">{receiptData.cardNumber}</span>
@@ -833,7 +799,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                   </div>
                 </div>
 
-                {/* Bottom Serrated Edges */}
                 <div className="absolute bottom-0 left-0 right-0 h-2 bg-transparent flex justify-between overflow-hidden">
                   {Array.from({ length: 16 }).map((_, i) => (
                     <div key={i} className="w-3.5 h-3.5 bg-zinc-950 rounded-full shrink-0 translate-y-2" />
@@ -841,7 +806,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                 </div>
               </div>
 
-              {/* Close Button */}
               <button
                 onClick={() => {
                   triggerHaptic();
@@ -855,7 +819,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-
     </MacCatWindowFrame>
   );
 };

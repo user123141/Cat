@@ -490,16 +490,16 @@ export const CatWindow: React.FC<CatWindowProps> = ({
 
                 {/* The Cat */}
                 <div className="scale-95 md:scale-105 pointer-events-none select-none">
-                  <CatRenderer
-                    breed={activeCat.breed}
-                    color={activeSkinColors.color}
-                    patternColor={activeSkinColors.patternColor}
-                    eyeColor={activeSkinColors.eyeColor}
-                    accessory={(activeCat as any).accessory}
-                    status={isGroomingComplete ? 'idle' : activeCat.status}
-                    size={130}
-                    personality={activeCat.personality}
-                  />
+<CatRenderer
+  breed={activeCat.breed}
+  color={activeSkinColors.color}
+  patternColor={activeSkinColors.patternColor}
+  eyeColor={activeSkinColors.eyeColor}
+  accessory={(activeCat as any).accessory}
+  status={activeCat.status}
+  size={window.innerWidth < 768 ? 180 : 140} // увеличиваем на мобильных
+  personality={activeCat.personality}
+/>
                 </div>
 
                 {/* Floating Comb Tool (Only when not sleeping) */}

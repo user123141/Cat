@@ -12,7 +12,7 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
   notifications,
   onDismiss,
 }) => {
-  const activeNotification = notifications[0]; // focus on latest notification
+  const activeNotification = notifications[0];
   const [isExpanded, setIsExpanded] = useState(false);
   const [timeStr, setTimeStr] = useState(() => {
     const now = new Date();
@@ -30,16 +30,12 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
   useEffect(() => {
     if (activeNotification) {
       setIsExpanded(true);
-      
-      // Auto shrink and dismiss after 4 seconds
       const timer = setTimeout(() => {
         setIsExpanded(false);
-        // Delay actual dismissal to let shrink animation finish
         setTimeout(() => {
           onDismiss(activeNotification.id);
         }, 500);
       }, 4000);
-
       return () => clearTimeout(timer);
     } else {
       setIsExpanded(false);
@@ -71,7 +67,7 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
               y: 14,
               opacity: 1,
               width: isExpanded ? '380px' : '150px',
-              height: isExpanded ? 'auto' : '30px',
+              height: isExpanded ? 'auto' : '26px',
               borderRadius: isExpanded ? '24px' : '999px',
             }}
             exit={{ scale: 0.9, y: 4, opacity: 0 }}
@@ -90,12 +86,9 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
                 transition={{ delay: 0.1 }}
                 className="flex items-start gap-3 w-full"
               >
-                {/* Circle Icon Badge */}
                 <div className="p-2 rounded-full bg-neutral-900 border border-neutral-800 flex-shrink-0 mt-0.5">
                   {getIcon(activeNotification.type)}
                 </div>
-
-                {/* Text Content */}
                 <div className="flex-grow min-w-0 pr-4">
                   <h4 className="text-xs font-semibold text-neutral-100 tracking-wide leading-tight">
                     {activeNotification.title}
@@ -104,8 +97,6 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
                     {activeNotification.message}
                   </p>
                 </div>
-
-                {/* Small notification badge count */}
                 {notifications.length > 1 && (
                   <div className="text-[9px] font-mono font-bold bg-sky-500 text-white rounded-full px-1.5 py-0.5 flex-shrink-0 animate-bounce">
                     +{notifications.length - 1}
@@ -113,7 +104,6 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
                 )}
               </motion.div>
             ) : (
-              // Pill micro-collapsed state
               <div className="flex items-center justify-center gap-2 w-full h-full text-[10px] text-neutral-400 font-medium">
                 <Bell size={10} className="text-sky-400 animate-swing" />
                 <span className="truncate">Событие...</span>
@@ -121,15 +111,13 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
             )}
           </motion.div>
         ) : (
-          // Camera notch / fully visible active status capsule
           <motion.div
-            initial={{ width: '130px', height: '26px', borderRadius: '999px', opacity: 0.8 }}
-            animate={{ width: '130px', height: '26px', borderRadius: '999px', opacity: 1 }}
-            className="pointer-events-auto bg-black text-white/95 shadow-2xl flex items-center justify-center gap-2 border border-white/10 px-3 py-1 font-mono text-[9px] font-extrabold tracking-wider mt-1"
+            initial={{ width: '100px', height: '22px', borderRadius: '999px', opacity: 0.8 }}
+            animate={{ width: '100px', height: '22px', borderRadius: '999px', opacity: 1 }}
+            className="pointer-events-auto bg-black text-white/95 shadow-2xl flex items-center justify-center gap-1.5 border border-white/10 px-2 py-0.5 font-mono text-[8px] font-extrabold tracking-wider mt-1"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="text-white/60 font-sans tracking-normal">Care OS</span>
-            <span className="text-white/20">|</span>
+            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="text-white/30 font-sans tracking-normal">|</span>
             <span className="text-sky-300 font-bold">{timeStr}</span>
           </motion.div>
         )}

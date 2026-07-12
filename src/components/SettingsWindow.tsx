@@ -11,13 +11,12 @@ interface SettingsWindowProps {
   onSync: () => void;
   onUpdateNickname: (name: string) => void;
   onUpdateTheme: (theme: 'light' | 'dark' | 'auto') => void;
-  onUpdateWallpaper: (id: string) => void; // Выбор обоев
-  onClaimReviewReward: () => void; // Новая кнопка бонуса за отзыв
+  onUpdateWallpaper: (id: string) => void;
+  onClaimReviewReward: () => void;
   isOfflineMode: boolean;
   setIsOfflineMode: (off: boolean) => void;
   syncLog: string[];
   lastSyncedTime: string;
-  simulateConflictDeviceSwitch: () => void;
   onRedeemPromo: (code: string) => { success: boolean; message: string };
   onClose: () => void;
   onMinimize: () => void;
@@ -35,7 +34,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
   setIsOfflineMode,
   syncLog,
   lastSyncedTime,
-  simulateConflictDeviceSwitch,
   onRedeemPromo,
   onClose,
   onMinimize,
@@ -44,8 +42,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
   const [saveCode, setSaveCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [pastedStatus, setPastedStatus] = useState<'idle' | 'success' | 'error'>('idle');
-
-  // Локальные состояния промокода
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [promoStatusText, setPromoStatusText] = useState('');
   const [promoStatusType, setPromoStatusType] = useState<'idle' | 'success' | 'error'>('idle');
@@ -79,8 +75,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
   const handleTouchEnd = (e: React.TouchEvent) => {
     const diffX = e.changedTouches[0].clientX - touchStartX.current;
     const diffY = e.changedTouches[0].clientY - touchStartY.current;
-    
-    // Swipe down to minimize
     if (diffY > 100 && Math.abs(diffX) < 60) {
       onMinimize();
     }
@@ -94,7 +88,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
     }
   };
 
-  // Экспорт кода сохранения в Base64
   const handleExportSave = () => {
     try {
       const dataStr = JSON.stringify(profile);
@@ -108,13 +101,11 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
     }
   };
 
-  // Импорт прогресса из кода сохранения
   const handleImportSave = () => {
     try {
       if (!saveCode.trim()) return;
       const jsonStr = decodeURIComponent(escape(atob(saveCode.trim())));
       const parsed = JSON.parse(jsonStr);
-      
       if (parsed && typeof parsed === 'object' && parsed.nickname && Array.isArray(parsed.cats)) {
         localStorage.setItem('maccat_profile', jsonStr);
         setPastedStatus('success');
@@ -142,8 +133,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
     window.location.reload();
   };
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-
   return (
     <MacCatWindowFrame
       id="settings"
@@ -152,17 +141,13 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
       title="Системные настройки"
       subtitle="Настройки"
     >
-      {/* 2. Window Content */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-900/40 space-y-4">
-        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Profile Name */}
           <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <User size={14} className="text-sky-400" />
               Профиль Опекуна
             </h3>
-
             <div className="flex items-center gap-2">
               <input
                 type="text"
@@ -181,13 +166,11 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
             </div>
           </div>
 
-          {/* Theme Settings */}
           <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <Sun size={14} className="text-sky-400" />
               Тема оформления
             </h3>
-
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 onClick={() => onUpdateTheme('light')}
@@ -200,7 +183,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
                 <Sun size={12} />
                 <span>Светлая</span>
               </button>
-
               <button
                 onClick={() => onUpdateTheme('dark')}
                 className={`py-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
@@ -212,7 +194,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
                 <Moon size={12} />
                 <span>Темная</span>
               </button>
-
               <button
                 onClick={() => onUpdateTheme('auto')}
                 className={`py-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
@@ -228,13 +209,11 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           </div>
         </div>
 
-        {/* ВЫБОР ОБОЕВ РАБОЧЕГО СТОЛА */}
         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles size={14} className="text-sky-400" />
             Обои Рабочего Стола macOS
           </h3>
-
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { id: 'ventura', name: 'Ventura Orange', colors: 'bg-gradient-to-tr from-orange-400 via-pink-500 to-indigo-600' },
@@ -258,22 +237,18 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           </div>
         </div>
 
-        {/* REVIEW BONUS BANNER (Claim 100 paws) */}
         <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3 text-left">
             <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
               <Star size={20} className="animate-spin-slow" />
             </div>
             <div>
-              <h4 className="text-xs font-black text-white flex items-center gap-1.5">
-                Бонус за отзыв об игре! ⭐️
-              </h4>
+              <h4 className="text-xs font-black text-white flex items-center gap-1.5">Бонус за отзыв об игре! ⭐️</h4>
               <p className="text-[10px] text-slate-300 leading-normal max-w-sm">
-                Оставьте отзыв о нашей игре Care OS! Вы получите приятный мгновенный бонус <span className="font-extrabold text-amber-400">+100 лапок 🐾</span> на ваш баланс. Работает один раз!
+                Оставьте отзыв о нашей игре Care OS! Вы получите <span className="font-extrabold text-amber-400">+100 лапок 🐾</span>.
               </p>
             </div>
           </div>
-
           <button
             onClick={onClaimReviewReward}
             disabled={profile.claimedReviewReward}
@@ -287,7 +262,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           </button>
         </div>
 
-        {/* PROMO CODES ENGINE */}
         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <Percent size={14} className="text-sky-400" />
@@ -296,7 +270,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           <p className="text-[10px] text-slate-400 leading-normal">
             Активируйте фирменные промокоды для получения подарочных лапок 🐾. Допускается использование <strong className="text-amber-400 font-bold">не чаще одного раза в неделю</strong>.
           </p>
-
           <div className="flex gap-2">
             <input
               type="text"
@@ -312,7 +285,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
               Активировать
             </button>
           </div>
-
           {promoStatusText && (
             <p className={`text-[10px] font-bold ${
               promoStatusType === 'success' ? 'text-emerald-400' : 'text-rose-400'
@@ -322,7 +294,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           )}
         </div>
 
-        {/* Firebase Cloud Sync & Conflict Resolution Simulation Console */}
         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="space-y-0.5 text-left">
@@ -334,8 +305,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
                 Автоматическая синхронизация прогресса "на лету" с надежным механизмом разрешения конфликтов.
               </p>
             </div>
-
-            {/* Offline Toggle Switch */}
             <div className="flex items-center gap-2 bg-black/35 px-3 py-1.5 rounded-xl border border-white/5 shrink-0">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Оффлайн-режим</span>
               <button
@@ -355,7 +324,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Sync actions */}
             <div className="space-y-2 flex flex-col justify-between">
               <div className="space-y-1">
                 <span className="block text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider text-left">Управление сейвом</span>
@@ -371,28 +339,9 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
                   Последний бэкап: <span className="font-bold text-slate-300">{lastSyncedTime}</span>
                 </div>
               </div>
-
-              {/* Conflict Trigger Simulation Button */}
-              <div className="space-y-1">
-                <span className="block text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider text-left">Тест конфликтов</span>
-                <button
-                  onClick={() => {
-                    triggerHaptic();
-                    simulateConflictDeviceSwitch();
-                  }}
-                  className="w-full p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold text-[10px] flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-                >
-                  <span>Симулировать конфликт iPad</span>
-                </button>
-                <span className="text-[8px] text-slate-500 leading-tight block text-left">
-                  Запишет в облако другие данные, чтобы вызвать автоматическое окно слияния при следующем клике Sync.
-                </span>
-              </div>
             </div>
-
-            {/* Sync Live Console logs */}
             <div className="md:col-span-2 space-y-1.5 text-left">
-              <span className="block text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">Консоль отладки Firestore (Реальное время)</span>
+              <span className="block text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">Консоль отладки Firestore</span>
               <div className="h-[125px] overflow-y-auto bg-black/65 border border-white/5 rounded-xl p-2.5 font-mono text-[9px] text-slate-300 space-y-1 scrollbar-thin">
                 {syncLog.map((log, index) => (
                   <div key={index} className={`${
@@ -408,7 +357,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           </div>
         </div>
 
-        {/* Keys backup cards */}
         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3.5">
           <div className="space-y-0.5">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -419,7 +367,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
               Помимо автосохранений Firebase, вы можете экспортировать буквенные ключи для ручного переноса прогресса.
             </p>
           </div>
-
           <div className="flex gap-1.5">
             <input
               type="text"
@@ -428,14 +375,12 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
               placeholder="Вставьте код сохранения"
               className="flex-1 px-3 py-2 text-xs font-mono rounded-xl bg-black/35 border border-white/10 text-slate-300 focus:outline-none focus:border-sky-500 transition-all"
             />
-            
             <button
               onClick={handleExportSave}
               className="px-3 py-2 text-xs font-bold rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all cursor-pointer flex-shrink-0"
             >
               {copied ? 'Готово!' : 'Экспорт'}
             </button>
-
             <button
               onClick={handleImportSave}
               className={`px-3 py-2 text-xs font-bold rounded-xl text-white transition-all cursor-pointer flex-shrink-0 ${
@@ -451,13 +396,11 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           </div>
         </div>
 
-        {/* Danger zone and credentials */}
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-t border-white/5 pt-4 text-[10px]">
           <div className="flex items-center gap-1.5 text-slate-400 text-left">
             <Sparkles size={12} className="text-amber-400" />
             <span>Главный дизайнер и разработчик Care OS: <strong className="text-slate-300">Maksym Skorina</strong></span>
           </div>
-
           <button
             onClick={handleReset}
             className="px-3 py-1.5 rounded-xl border border-rose-500/30 text-rose-400 bg-rose-500/5 hover:bg-rose-500/15 transition-all font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 self-end sm:self-center shrink-0"
@@ -466,10 +409,8 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
             <span>Сбросить данные</span>
           </button>
         </div>
-
       </div>
 
-      {/* APPLE-STYLE CUSTOM CONFIRMATION DIALOG */}
       <AnimatePresence>
         {showResetConfirm && (
           <motion.div
@@ -487,15 +428,10 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
               <div className="w-12 h-12 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-3.5">
                 <Trash2 size={22} className="animate-pulse" />
               </div>
-
-              <h4 className="text-xs font-black text-white uppercase tracking-wider mb-1">
-                Стереть весь прогресс?
-              </h4>
-              
+              <h4 className="text-xs font-black text-white uppercase tracking-wider mb-1">Стереть весь прогресс?</h4>
               <p className="text-[10px] text-slate-300 leading-relaxed mb-4">
                 Это действие полностью сотрет всех ваших котиков, лапки, купленные скины и историю активности. Это невозможно отменить.
               </p>
-
               <div className="space-y-1.5">
                 <button
                   onClick={executeReset}

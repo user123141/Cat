@@ -1,0 +1,106 @@
+import React from 'react';
+import { motion } from 'motion/react';
+import { ShoppingBag, Target, Settings, TrendingUp, Sparkles } from 'lucide-react';
+
+interface DockProps {
+  activeWindow: string | null;
+  minimizedWindows: string[];
+  onOpenWindow: (windowId: string) => void;
+}
+
+export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOpenWindow }) => {
+  const dockItems = [
+    {
+      id: 'cats',
+      label: 'Котята',
+      icon: (
+        <span className="text-2xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)] select-none">
+          🐱
+        </span>
+      ),
+    },
+    {
+      id: 'antistress',
+      label: 'Антистресс',
+      icon: <Sparkles size={24} className="text-amber-500 animate-pulse" />,
+    },
+    {
+      id: 'shop',
+      label: 'Магазин',
+      icon: <ShoppingBag size={24} className="text-purple-600 dark:text-purple-400" />,
+    },
+    {
+      id: 'quests',
+      label: 'Задания',
+      icon: <Target size={24} className="text-rose-500" />,
+    },
+    {
+      id: 'analytics',
+      label: 'Аналитика',
+      icon: <TrendingUp size={24} className="text-emerald-500" />,
+    },
+    {
+      id: 'settings',
+      label: 'Настройки',
+      icon: <Settings size={24} className="text-slate-600 dark:text-slate-300" />,
+    },
+  ];
+
+  return (
+    <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none z-40 select-none px-4">
+      <motion.div
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.5 }}
+        className="pointer-events-auto flex items-end gap-2.5 md:gap-3.5 px-4.5 py-2.5 md:py-3.5 rounded-[26px] bg-white/25 dark:bg-black/25 backdrop-blur-xl border border-white/30 dark:border-white/15 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] relative max-w-full overflow-x-auto no-scrollbar scrollbar-none"
+      >
+        {dockItems.map((item) => {
+          const isOpen = activeWindow === item.id;
+          const isMinimized = minimizedWindows.includes(item.id);
+
+          return (
+            <div key={item.id} className="relative group flex flex-col items-center">
+              {/* Tooltip */}
+              <div className="absolute -top-10 scale-90 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 bg-neutral-900/95 dark:bg-neutral-800/95 text-white border border-white/10 text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-50">
+                {item.label}
+              </div>
+
+              {/* Icon Launcher */}
+              <motion.button
+                whileHover={{
+                  scale: 1.25,
+                  y: -10,
+                }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                onClick={() => onOpenWindow(item.id)}
+                className={`w-11 h-11 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition-all cursor-pointer relative shadow-md backdrop-blur-md ${
+                  isOpen
+                    ? 'bg-white/55 dark:bg-black/55 border border-white/50 dark:border-white/20 shadow-lg'
+                    : isMinimized
+                    ? 'bg-white/20 dark:bg-black/30 border border-amber-500/40 hover:bg-white/35 dark:hover:bg-black/45'
+                    : 'bg-white/10 dark:bg-black/20 border border-white/15 dark:border-white/10 hover:bg-white/25 dark:hover:bg-black/35'
+                }`}
+              >
+                {item.icon}
+              </motion.button>
+
+              {/* Running Status Dot */}
+              <div className="h-1.5 flex items-center justify-center mt-1">
+                <div
+                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                    isOpen
+                      ? 'bg-sky-400 scale-110 shadow-[0_0_8px_#38bdf8]'
+                      : isMinimized
+                      ? 'bg-amber-400 scale-100 shadow-[0_0_6px_#f59e0b]'
+                      : 'bg-transparent scale-0'
+                  }`}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </motion.div>
+    </div>
+  );
+};

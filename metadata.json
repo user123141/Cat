@@ -1,0 +1,6 @@
+{
+  "name": "MacCat Care",
+  "description": "An elegant Apple-style macOS minimalist cat care simulation game with gorgeous glassmorphism, simulated SwiftUI widgets, a macOS-like desktop & dock, Dynamic Island, a skin shop, paw currency, daily quests, and cloud sync. Designed by Maksym Skorina.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

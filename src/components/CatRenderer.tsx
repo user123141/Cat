@@ -403,61 +403,201 @@ export const CatRenderer: React.FC<CatRendererProps> = ({
           />
         </>
 
-        {/* Accessories (Crown, Ribbon/Collar, Glasses, Top hat, Bow tie, etc.) */}
-        {(accessory === 'collar_bell' || (accessory && (accessory.includes('bell') || accessory.includes('collar')))) && (
-          <>
-            {/* Red Collar */}
-            <path d="M72 108C85 116 115 116 128 108" stroke="#ef4444" strokeWidth="8" strokeLinecap="round" />
-            {/* Gold Bell */}
-            <circle cx="100" cy="116" r="7" fill="#fbbf24" stroke="#d97706" strokeWidth="1" />
-            <circle cx="100" cy="114" r="2" fill="#fff" />
-          </>
-        )}
+        {/* Accessories Rendering */}
+        {(() => {
+          if (!accessory) return null;
+          
+          const getAccessoryColor = (acc: string) => {
+            const accLower = acc.toLowerCase();
+            if (accLower.includes('розов') || accLower.includes('pink')) return '#ec4899';
+            if (accLower.includes('син') || accLower.includes('blue')) return '#3b82f6';
+            if (accLower.includes('зелен') || accLower.includes('изумруд') || accLower.includes('green') || accLower.includes('emerald')) return '#10b981';
+            if (accLower.includes('янт') || accLower.includes('желт') || accLower.includes('amber') || accLower.includes('yellow')) return '#f59e0b';
+            if (accLower.includes('амет') || accLower.includes('фиолет') || accLower.includes('purple')) return '#a855f7';
+            if (accLower.includes('малин')) return '#e11d48';
+            if (accLower.includes('бир') || accLower.includes('cyan')) return '#06b6d4';
+            if (accLower.includes('оранж') || accLower.includes('orange')) return '#ea580c';
+            return '#ef4444'; // default red
+          };
 
-        {(accessory === 'gold_crown' || (accessory && (accessory.includes('crown') || accessory.includes('halo')))) && (
-          // Little cute gold crown on head
-          <path
-            d="M82 40L86 24L96 32L100 18L104 32L114 24L118 40H82Z"
-            fill="#fbbf24"
-            stroke="#d97706"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-        )}
+          const colorHex = getAccessoryColor(accessory);
 
-        {(accessory === 'cool_glasses' || (accessory && (accessory.includes('glasses') || accessory.includes('headphones')))) && (
-          // Black cool sunglasses
-          <>
-            <path d="M72 70C72 70 78 77 88 72" stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
-            <path d="M112 72C112 72 118 77 128 70" stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
-            {/* Glasses frame connector */}
-            <line x1="88" y1="71" x2="112" y2="71" stroke="#1e293b" strokeWidth="4" />
-            {/* Lens glare reflections */}
-            <line x1="76" y1="70" x2="82" y2="74" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
-            <line x1="116" y1="70" x2="122" y2="74" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
-          </>
-        )}
+          return (
+            <>
+              {/* 1. Collar & Bell */}
+              {(accessory === 'collar_bell' || accessory.includes('bell') || accessory.includes('collar')) && (
+                <>
+                  {/* Collar */}
+                  <path d="M72 108C85 116 115 116 128 108" stroke={colorHex} strokeWidth="8" strokeLinecap="round" />
+                  {/* Gold Bell */}
+                  <circle cx="100" cy="116" r="7" fill="#fbbf24" stroke="#d97706" strokeWidth="1" />
+                  <circle cx="100" cy="114" r="2" fill="#fff" />
+                </>
+              )}
 
-        {(accessory === 'wizard_hat' || (accessory && (accessory.includes('hat') || accessory.includes('wings')))) && (
-          // Wizard Hat
-          <g transform="translate(100, 36) scale(0.95)">
-            <path d="M-45 0C-20 -5 20 -5 45 0L0 -60L-45 0Z" fill="#6366f1" />
-            <ellipse cx="0" cy="0" rx="48" ry="8" fill="#4f46e5" />
-            {/* Gold band */}
-            <path d="M-19 -7C-10 -11 10 -11 19 -7L14 -1L-14 -1Z" fill="#fbbf24" />
-            {/* Star decal */}
-            <path d="M0 -30L2 -25L7 -25L3 -21L5 -16L0 -19L-5 -16L-3 -21L-7 -25L-2 -25Z" fill="#fff" />
-          </g>
-        )}
+              {/* 2. Gold Crown */}
+              {accessory.includes('crown') && (
+                <path
+                  d="M82 40L86 24L96 32L100 18L104 32L114 24L118 40H82Z"
+                  fill="#fbbf24"
+                  stroke="#d97706"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+              )}
 
-        {(accessory === 'bow_tie' || (accessory && (accessory.includes('bow') || accessory.includes('tie') || accessory.includes('scarf') || accessory.includes('ribbon')))) && (
-          // Red Bow Tie at chest
-          <g transform="translate(100, 114)">
-            <path d="M-15 -6L0 0L-15 6V-6Z" fill="#ef4444" />
-            <path d="M15 -6L0 0L15 6V-6Z" fill="#ef4444" />
-            <circle cx="0" cy="0" r="4.5" fill="#b91c1c" />
-          </g>
-        )}
+              {/* 3. Halo (Нимб) */}
+              {accessory.includes('halo') && (
+                <g transform="translate(100, 15)">
+                  <ellipse cx="0" cy="0" rx="24" ry="6" fill="none" stroke="#fef08a" strokeWidth="4" opacity="0.9" />
+                  <line x1="0" y1="3" x2="0" y2="15" stroke="#fef08a" strokeWidth="1.5" opacity="0.5" />
+                </g>
+              )}
+
+              {/* 4. Cool Glasses */}
+              {accessory.includes('glasses') && (
+                <>
+                  <path d="M72 70C72 70 78 77 88 72" stroke={colorHex} strokeWidth="8" strokeLinecap="round" />
+                  <path d="M112 72C112 72 118 77 128 70" stroke={colorHex} strokeWidth="8" strokeLinecap="round" />
+                  {/* Glasses frame connector */}
+                  <line x1="88" y1="71" x2="112" y2="71" stroke={colorHex} strokeWidth="4" />
+                  {/* Lens glare reflections */}
+                  <line x1="76" y1="70" x2="82" y2="74" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+                  <line x1="116" y1="70" x2="122" y2="74" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+                </>
+              )}
+
+              {/* 5. Headphones (Геймерские наушники) */}
+              {accessory.includes('headphones') && (
+                <g transform="translate(100, 52)">
+                  {/* Arch */}
+                  <path d="M-36 -12C-36 -42 36 -42 36 -12" fill="none" stroke={colorHex} strokeWidth="5" />
+                  {/* Left Cup */}
+                  <g transform="translate(-36, -10)">
+                    <rect x="-8" y="-12" width="16" height="24" rx="6" fill={colorHex} />
+                    <circle cx="-2" cy="0" r="4" fill="#ffffff" opacity="0.3" />
+                    {/* Cat ear detail */}
+                    <path d="M-8 -12L-14 -22L-2 -12Z" fill={colorHex} />
+                  </g>
+                  {/* Right Cup */}
+                  <g transform="translate(36, -10)">
+                    <rect x="-8" y="-12" width="16" height="24" rx="6" fill={colorHex} />
+                    <circle cx="2" cy="0" r="4" fill="#ffffff" opacity="0.3" />
+                    {/* Cat ear detail */}
+                    <path d="M8 -12L14 -22L2 -12Z" fill={colorHex} />
+                  </g>
+                </g>
+              )}
+
+              {/* 6. Scarf (Теплый Шарф) */}
+              {accessory.includes('scarf') && (
+                <g transform="translate(100, 112)">
+                  <path d="M-32 -4C-15 4 15 4 32 -4C36 4 32 10 24 10C8 10 -8 10 -24 10C-32 10 -36 4 -32 -4Z" fill={colorHex} />
+                  <path d="M12 4L22 28C22 30 18 32 14 32C10 32 6 30 6 28L10 4" fill={colorHex} />
+                  <line x1="10" y1="32" x2="10" y2="35" stroke="#ffffff" strokeWidth="2" opacity="0.7" />
+                  <line x1="14" y1="32" x2="14" y2="35" stroke="#ffffff" strokeWidth="2" opacity="0.7" />
+                  <line x1="18" y1="32" x2="18" y2="35" stroke="#ffffff" strokeWidth="2" opacity="0.7" />
+                </g>
+              )}
+
+              {/* 7. Bow Tie / Ribbon */}
+              {(accessory.includes('bow_tie') || accessory.includes('ribbon') || accessory.includes('bow') || accessory.includes('tie')) && (
+                <g transform="translate(100, 114)">
+                  <path d="M-15 -6L0 0L-15 6V-6Z" fill={colorHex} />
+                  <path d="M15 -6L0 0L15 6V-6Z" fill={colorHex} />
+                  <circle cx="0" cy="0" r="4.5" fill="#b91c1c" />
+                </g>
+              )}
+
+              {/* 8. Fairy Wings (Крылья Бабочки) */}
+              {accessory.includes('wings') && (
+                <g transform="translate(100, 120)" opacity="0.8">
+                  {/* Left Wing */}
+                  <path d="M-28 -15C-65 -45 -85 -10 -55 10C-40 20 -30 10 -28 5" fill={colorHex} stroke="#ffffff" strokeWidth="1.5" />
+                  <path d="M-28 5C-55 20 -65 35 -48 45C-35 52 -28 35 -28 25" fill={colorHex} opacity="0.8" />
+                  {/* Right Wing */}
+                  <path d="M28 -15C65 -45 85 -10 55 10C40 20 30 10 28 5" fill={colorHex} stroke="#ffffff" strokeWidth="1.5" />
+                  <path d="M28 5C55 20 65 35 48 45C35 52 28 35 28 25" fill={colorHex} opacity="0.8" />
+                </g>
+              )}
+
+              {/* 9. Boots / Slippers (Тапочки) */}
+              {(accessory.includes('boots') || accessory.includes('slippers')) && (
+                <g>
+                  {/* Left Boot */}
+                  <g transform="translate(75, 172)">
+                    <ellipse cx="0" cy="2" rx="14" ry="10" fill={colorHex} />
+                    <path d="M-6 -2C-6 -2 -4 -12 0 -12C4 -12 6 -2 6 -2" stroke={colorHex} strokeWidth="5" strokeLinecap="round" />
+                    <ellipse cx="0" cy="-10" rx="9" ry="3" fill="#ffffff" />
+                  </g>
+                  {/* Right Boot */}
+                  <g transform="translate(125, 172)">
+                    <ellipse cx="0" cy="2" rx="14" ry="10" fill={colorHex} />
+                    <path d="M-6 -2C-6 -2 -4 -12 0 -12C4 -12 6 -2 6 -2" stroke={colorHex} strokeWidth="5" strokeLinecap="round" />
+                    <ellipse cx="0" cy="-10" rx="9" ry="3" fill="#ffffff" />
+                  </g>
+                </g>
+              )}
+
+              {/* 10. Star hairpin (Звездная Заколка) */}
+              {accessory.includes('star') && (
+                <g transform="translate(122, 40) rotate(15)">
+                  <path d="M0 -10L3 -3L10 -3L5 1L7 8L0 4L-7 8L-5 1L-10 -3L-3 -3Z" fill="#fbcfe8" stroke="#ec4899" strokeWidth="1" />
+                  <circle cx="0" cy="0" r="1.5" fill="#ffffff" />
+                </g>
+              )}
+
+              {/* 11. Hats */}
+              {/* Santa Hat */}
+              {(accessory.includes('santa_hat') || accessory.includes('santa')) && (
+                <g transform="translate(100, 36) scale(0.9)">
+                  <path d="M-28 0L-10 -35L18 -42L25 -30L20 0Z" fill="#ef4444" />
+                  <circle cx="24" cy="-38" r="8" fill="#ffffff" />
+                  <ellipse cx="0" cy="0" rx="32" ry="7" fill="#ffffff" />
+                </g>
+              )}
+
+              {/* Detective Hat */}
+              {(accessory.includes('detective_hat') || accessory.includes('detective')) && (
+                <g transform="translate(100, 32) scale(0.9)">
+                  <path d="M-36 0C-36 -30 36 -30 36 0Z" fill="#a1a1aa" stroke="#71717a" strokeWidth="1" />
+                  <ellipse cx="0" cy="0" rx="42" ry="6" fill="#71717a" />
+                  <path d="M-34 -4C-20 -7 20 -7 34 -4L32 1L-32 1Z" fill="#18181b" />
+                </g>
+              )}
+
+              {/* Party Hat */}
+              {(accessory.includes('party_hat') || accessory.includes('party')) && (
+                <g transform="translate(100, 34) scale(0.9)">
+                  <path d="M-20 0L0 -45L20 0Z" fill="#f43f5e" />
+                  <path d="M-13 -15L5 -20L10 -15L-6 -10Z" fill="#fbbf24" />
+                  <path d="M-7 -30L2 -32L5 -28L-4 -26Z" fill="#fbbf24" />
+                  <circle cx="0" cy="-45" r="5" fill="#3b82f6" />
+                  <ellipse cx="0" cy="0" rx="22" ry="4" fill="#fbbf24" />
+                </g>
+              )}
+
+              {/* Wizard Hat */}
+              {accessory.includes('wizard_hat') && (
+                <g transform="translate(100, 36) scale(0.95)">
+                  <path d="M-45 0C-20 -5 20 -5 45 0L0 -60L-45 0Z" fill="#6366f1" />
+                  <ellipse cx="0" cy="0" rx="48" ry="8" fill="#4f46e5" />
+                  <path d="M-19 -7C-10 -11 10 -11 19 -7L14 -1L-14 -1Z" fill="#fbbf24" />
+                  <path d="M0 -30L2 -25L7 -25L3 -21L5 -16L0 -19L-5 -16L-3 -21L-7 -25L-2 -25Z" fill="#fff" />
+                </g>
+              )}
+
+              {/* Standard cylinder/hat */}
+              {(accessory.includes('hat_') || accessory.includes('cylinder')) && (
+                <g transform="translate(100, 34) scale(0.9)">
+                  <rect x="-24" y="-35" width="48" height="35" fill={colorHex} />
+                  <rect x="-24" y="-7" width="48" height="7" fill="#1e293b" />
+                  <ellipse cx="0" cy="0" rx="36" ry="6" fill={colorHex} />
+                </g>
+              )}
+            </>
+          );
+        })()}
       </svg>
       </motion.div>
     </div>

@@ -38,6 +38,101 @@ export const CatWindow: React.FC<CatWindowProps> = ({
   const [particles, setParticles] = useState<ClickParticle[]>([]);
   const [rightTab, setRightTab] = useState<'care' | 'grooming' | 'diary'>('care');
 
+  const catStageRef = useRef<HTMLDivElement>(null);
+
+  const FOODS = [
+    { id: 'fish', name: 'Лосось', emoji: '🐟', color: 'from-sky-400 to-blue-500' },
+    { id: 'meat', name: 'Стейк', emoji: '🥩', color: 'from-amber-500 to-red-600' },
+    { id: 'milk', name: 'Молоко', emoji: '🍼', color: 'from-teal-300 to-sky-400' },
+    { id: 'cake', name: 'Кекс', emoji: '🧁', color: 'from-pink-400 to-purple-500' },
+  ];
+
+  const handleFoodDragEnd = (foodId: string, event: any, info: any) => {
+    if (activeCat.status === 'sleeping') return;
+    
+    // Get client viewport coordinates
+    const dropX = info.point.x;
+    const dropY = info.point.y;
+
+    if (catStageRef.current) {
+      const rect = catStageRef.current.getBoundingClientRect();
+      // Generous 15px padding around the cat stage to make drag-and-drop extremely reliable
+      const padding = 15;
+      const isColliding = 
+        dropX >= (rect.left - padding) && 
+        dropX <= (rect.right + padding) && 
+        dropY >= (rect.top - padding) && 
+        dropY <= (rect.bottom + padding);
+
+      if (isColliding) {
+        feedCatWithFood(foodId);
+        return;
+      }
+    }
+
+    // Backup check using event client coordinates directly
+    const eventX = event?.clientX || event?.changedTouches?.[0]?.clientX;
+    const eventY = event?.clientY || event?.changedTouches?.[0]?.clientY;
+    if (eventX !== undefined && eventY !== undefined && catStageRef.current) {
+      const rect = catStageRef.current.getBoundingClientRect();
+      const padding = 15;
+      if (
+        eventX >= (rect.left - padding) && 
+        eventX <= (rect.right + padding) && 
+        eventY >= (rect.top - padding) && 
+        eventY <= (rect.bottom + padding)
+      ) {
+        feedCatWithFood(foodId);
+      }
+    }
+  };
+
+  const handleFoodClick = (foodId: string) => {
+    if (activeCat.status === 'sleeping') return;
+    feedCatWithFood(foodId);
+  };
+
+  const feedCatWithFood = (foodId: string) => {
+    if (activeCat.hunger >= 100) {
+      const newParticle = {
+        id: Math.random().toString(),
+        text: `${activeCat.name} сыт! 😾💤`,
+        x: 100 + Math.random() * 80,
+        y: 80 + Math.random() * 30,
+      };
+      setParticles((prev) => [...prev, newParticle]);
+      setTimeout(() => {
+        setParticles((prev) => prev.filter((p) => p.id !== newParticle.id));
+      }, 1500);
+      return;
+    }
+
+    triggerHapticMedium();
+    playPetSound();
+
+    const foodItem = FOODS.find(f => f.id === foodId);
+    const emoji = foodItem ? foodItem.emoji : '🐟';
+
+    const isHungry = activeCat.personality === 'hungry';
+    const xpGained = foodId === 'meat' ? 25 : foodId === 'cake' ? 18 : foodId === 'fish' ? 15 : 10;
+    const pawsGained = foodId === 'meat' ? 7 : foodId === 'cake' ? 4 : foodId === 'fish' ? 5 : 3;
+    const bonusXp = isHungry ? Math.round(xpGained * 1.3) : xpGained;
+    const bonusPaws = isHungry ? Math.round(pawsGained * 1.3) : pawsGained;
+
+    const newParticle = {
+      id: Math.random().toString(),
+      text: `Ам-ням! ${emoji} +${bonusXp} XP +${bonusPaws} 🐾`,
+      x: 100 + Math.random() * 80,
+      y: 80 + Math.random() * 30,
+    };
+    setParticles((prev) => [...prev, newParticle]);
+    setTimeout(() => {
+      setParticles((prev) => prev.filter((p) => p.id !== newParticle.id));
+    }, 1500);
+
+    onInteract('feed');
+  };
+
   // Груминг / Расческа
   const [brushProgress, setBrushProgress] = useState(0);
   const [isGroomingComplete, setIsGroomingComplete] = useState(false);
@@ -133,43 +228,23 @@ export const CatWindow: React.FC<CatWindowProps> = ({
     onInteract(action);
   };
 
-  const handlePetStageClick = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    triggerHapticLight();
-    // Play sound
-    playPetSound();
-    
-    // Trigger callback
-    onPetClick();
+  const isPettingRef = useRef(false);
+  const lastPetPointRef = useRef<{ x: number; y: number } | null>(null);
+  const petDistanceAccumulator = useRef(0);
 
-    // Spawn floating heart particle
-    const rect = e.currentTarget.getBoundingClientRect();
-    let clientX = 0;
-    let clientY = 0;
-
-    if ('touches' in e) {
-      if (e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      } else if ('changedTouches' in e && e.changedTouches.length > 0) {
-        clientX = e.changedTouches[0].clientX;
-        clientY = e.changedTouches[0].clientY;
-      }
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
-    const clickX = clientX - rect.left;
-    const clickY = clientY - rect.top;
-
+  const spawnPhraseParticle = (clickX: number, clickY: number, isStroke = false) => {
     const personality = activeCat?.personality || 'lazy';
     let phrases: string[] = [];
-    if (personality === 'lazy') {
-      phrases = ['Муррр... сплю... 💤', 'Лееень~ 🥱', 'Хррр-мяу... 🥰', 'Почеши пузико... 🐾', 'Кайф~ 💤'];
-    } else if (personality === 'playful') {
-      phrases = ['Йохоу! Побегаем? 🎾', 'Мяу-мяу! Играть! ⚡', 'Кусь! Жепку кусь! 😼', 'Давай прыгать! 🐾', 'Ещё погладь! 💖'];
-    } else { // hungry
-      phrases = ['Дай рыбки! 🐟', 'Мяу-у-у, жрать! 🍖', 'Где мой корм? 🍼', 'Ам-ням! 🐾', 'Гладь, но лучше покорми! 🥩'];
+    if (isStroke) {
+      phrases = ['Оооо да... 💖', 'Так тепло... 🥰', 'Мур-мур-мур... ✨', 'Обожаю поглаживания! 🐾', 'Ещё-ещё! 💫'];
+    } else {
+      if (personality === 'lazy') {
+        phrases = ['Муррр... сплю... 💤', 'Лееень~ 🥱', 'Хррр-мяу... 🥰', 'Почеши пузико... 🐾', 'Кайф~ 💤'];
+      } else if (personality === 'playful') {
+        phrases = ['Йохоу! Побегаем? 🎾', 'Мяу-мяу! Играть! ⚡', 'Кусь! Жепку кусь! 😼', 'Давай прыгать! 🐾', 'Ещё погладь! 💖'];
+      } else { // hungry
+        phrases = ['Дай рыбки! 🐟', 'Мяу-у-у, жрать! 🍖', 'Где мой корм? 🍼', 'Ам-ням! 🐾', 'Гладь, но лучше покорми! 🥩'];
+      }
     }
     const randomText = phrases[Math.floor(Math.random() * phrases.length)];
 
@@ -184,6 +259,54 @@ export const CatWindow: React.FC<CatWindowProps> = ({
     setTimeout(() => {
       setParticles((prev) => prev.filter((p) => p.id !== newParticle.id));
     }, 1200);
+  };
+
+  const handlePetPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeCat.status === 'sleeping') return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isPettingRef.current = true;
+    lastPetPointRef.current = { x: e.clientX, y: e.clientY };
+    petDistanceAccumulator.current = 0;
+
+    triggerHapticLight();
+    playPetSound();
+    onPetClick();
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    spawnPhraseParticle(clickX, clickY, false);
+  };
+
+  const handlePetPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeCat.status === 'sleeping' || !isPettingRef.current || !lastPetPointRef.current) return;
+
+    const dx = e.clientX - lastPetPointRef.current.x;
+    const dy = e.clientY - lastPetPointRef.current.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    petDistanceAccumulator.current += distance;
+    lastPetPointRef.current = { x: e.clientX, y: e.clientY };
+
+    // Каждые 55 пикселей непрерывного поглаживания засчитываются как полноценный жест
+    if (petDistanceAccumulator.current >= 55) {
+      petDistanceAccumulator.current = 0;
+      triggerHapticLight();
+      playPetSound();
+      onPetClick();
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      spawnPhraseParticle(clickX, clickY, true);
+    }
+  };
+
+  const handlePetPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    isPettingRef.current = false;
+    lastPetPointRef.current = null;
+    petDistanceAccumulator.current = 0;
   };
 
   const getActiveSkin = () => {
@@ -334,13 +457,14 @@ export const CatWindow: React.FC<CatWindowProps> = ({
               <div className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-4 md:gap-6 relative min-h-[170px]">
                 {/* The Cat Stage Frame (Clickable for petting) */}
                 <div
-                  onClick={handlePetStageClick}
-                  onTouchStart={(e) => {
-                    e.stopPropagation();
-                    handlePetStageClick(e);
-                  }}
-                  className="relative bg-white/5 hover:bg-white/10 active:scale-98 transition-all border border-white/5 rounded-2xl w-36 h-36 md:w-44 md:h-44 flex flex-col items-center justify-center shadow-inner overflow-hidden cursor-pointer group"
-                  title="Нажмите на котика, чтобы погладить!"
+                  ref={catStageRef}
+                  id="cat-stage"
+                  data-cat-stage="true"
+                  onPointerDown={handlePetPointerDown}
+                  onPointerMove={handlePetPointerMove}
+                  onPointerUp={handlePetPointerUp}
+                  className="relative bg-white/5 hover:bg-white/10 active:scale-98 transition-all border border-white/5 rounded-2xl w-36 h-36 md:w-44 md:h-44 flex flex-col items-center justify-center shadow-inner overflow-hidden cursor-pointer group select-none touch-none"
+                  title="Гладьте котика зажатой мышкой/пальцем или кликайте!"
                 >
                   <div className="absolute inset-0 bg-radial-gradient from-sky-500/10 to-transparent pointer-events-none" />
                   
@@ -357,7 +481,7 @@ export const CatWindow: React.FC<CatWindowProps> = ({
                   
                   <div className="absolute bottom-2 inset-x-0 text-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                     <span className="text-[9px] bg-black/75 text-sky-300 px-2 py-0.5 rounded-full font-bold">
-                      Клик! 💖
+                      Гладь! 💖
                     </span>
                   </div>
                 </div>
@@ -395,12 +519,45 @@ export const CatWindow: React.FC<CatWindowProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Kitchen Cabinet Shelf */}
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-2.5 flex flex-col items-center justify-center shrink-0 w-full lg:w-44 shadow-inner">
+                  <span className="text-[8px] font-mono font-bold text-orange-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                    <Flame size={10} className="text-orange-500 animate-pulse" />
+                    Кухня (Тяни или Жми)
+                  </span>
+                  
+                  <div className="grid grid-cols-4 lg:grid-cols-2 gap-1.5 w-full">
+                    {FOODS.map((food) => (
+                      <motion.div
+                        key={food.id}
+                        drag={activeCat.status !== 'sleeping'}
+                        dragSnapToOrigin
+                        onDragEnd={(event, info) => handleFoodDragEnd(food.id, event, info)}
+                        onClick={() => handleFoodClick(food.id)}
+                        className={`p-1.5 bg-gradient-to-br ${food.color} rounded-xl shadow-md border border-white/10 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing hover:scale-105 active:scale-95 transition-all relative z-30 select-none ${
+                          activeCat.status === 'sleeping' ? 'opacity-30 cursor-not-allowed' : ''
+                        }`}
+                        whileHover={{ y: -2 }}
+                      >
+                        <span className="text-xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)] select-none pointer-events-none">{food.emoji}</span>
+                        <span className="text-[8px] font-black text-white mt-0.5 pointer-events-none">{food.name}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                  
+                  <span className="text-[7.5px] text-slate-400 mt-1.5 text-center leading-none">
+                    {activeCat.status === 'sleeping' 
+                      ? 'Котик спит 💤' 
+                      : 'Перетащите котику в рот!'}
+                  </span>
+                </div>
               </div>
 
               {/* Core care buttons */}
               <div className="mt-4 border-t border-white/5 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
                 <button
-                  onClick={(e) => handleAction('feed', e)}
+                  onClick={() => feedCatWithFood('fish')}
                   disabled={activeCat.status === 'sleeping'}
                   className="p-2 rounded-2xl bg-gradient-to-b from-orange-500/10 to-orange-500/20 hover:from-orange-500/20 hover:to-orange-500/30 border border-orange-500/15 text-orange-400 font-bold text-xs flex flex-col items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-25 disabled:cursor-not-allowed group touch-manipulation min-h-[44px]"
                 >

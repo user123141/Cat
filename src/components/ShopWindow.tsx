@@ -5,6 +5,19 @@ import { CatRenderer } from './CatRenderer';
 import { X, Sparkles, Check, ShoppingBag, CreditCard, ShieldCheck, Star, Sparkle, Percent, Receipt } from 'lucide-react';
 import { triggerHaptic } from '../utils/audio';
 import { MacCatWindowFrame } from './MacCatWindowFrame';
+import { CONSUMABLE_ITEMS } from '../hooks/useGameState';
+
+interface ShopProduct {
+  id: string;
+  name: string;
+  description: string;
+  emoji?: string;
+  cost: number;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  category: 'skins' | 'accessories' | 'food' | 'hygiene';
+  subcategory: string;
+  originalItem: Skin | typeof CONSUMABLE_ITEMS[0];
+}
 
 interface ShopWindowProps {
   profile: PlayerProfile | null;
@@ -37,8 +50,73 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
   onMinimize,
   onRedeemPromo,
 }) => {
-  const [activeTab, setActiveTab] = useState<'skins' | 'accessories' | 'topup'>('skins');
-  const [selectedSkinId, setSelectedSkinId] = useState<string>(allSkins[0].id);
+  const [activeTab, setActiveTab] = useState<'skins' | 'accessories' | 'food' | 'hygiene' | 'topup'>('skins');
+  const [selectedSkinId, setSelectedSkinId] = useState<string>(allSkins[0]?.id || '');
+
+  // Dynamic mapping of all items to a generic structure
+  const shopProducts = React.useMemo<ShopProduct[]>(() => {
+    const products: ShopProduct[] = [];
+
+    // Add skins and accessories from allSkins
+    allSkins.forEach(skin => {
+      if (!skin.accessory) {
+        products.push({
+          id: skin.id,
+          name: skin.name,
+          description: skin.description,
+          cost: skin.cost,
+          rarity: skin.rarity,
+          category: 'skins',
+          subcategory: 'Кошачьи окрасы',
+          originalItem: skin
+        });
+      } else {
+        // Detect subcategory for accessory dynamically from its key/id!
+        let subcat = 'Другие аксессуары';
+        const accId = skin.accessory.toLowerCase();
+        if (accId.includes('boots') || accId.includes('footwear') || accId.includes('shoes') || accId.includes('tapochki') || accId.includes('sapozhki')) {
+          subcat = 'Обувь и Лапки 🥾';
+        } else if (accId.includes('hat') || accId.includes('halo') || accId.includes('crown') || accId.includes('cap') || accId.includes('shlyapa') || accId.includes('kolpak')) {
+          subcat = 'Головные уборы 🎩';
+        } else if (accId.includes('glasses') || accId.includes('eyewear') || accId.includes('headphones') || accId.includes('ochki') || accId.includes('naushniki')) {
+          subcat = 'Очки и Наушники 🕶️';
+        } else if (accId.includes('collar') || accId.includes('bell') || accId.includes('ribbon') || accId.includes('bow') || accId.includes('scarf') || accId.includes('osheynik') || accId.includes('bantik') || accId.includes('sharf')) {
+          subcat = 'Шейные украшения 🎀';
+        } else if (accId.includes('wings') || accId.includes('krylya')) {
+          subcat = 'Спина и Крылья 🦋';
+        }
+
+        products.push({
+          id: skin.id,
+          name: skin.name,
+          description: skin.description,
+          cost: skin.cost,
+          rarity: skin.rarity,
+          category: 'accessories',
+          subcategory: subcat,
+          originalItem: skin
+        });
+      }
+    });
+
+    // Add food and hygiene from CONSUMABLE_ITEMS
+    CONSUMABLE_ITEMS.forEach(cons => {
+      const isFood = cons.type === 'food';
+      products.push({
+        id: cons.id,
+        name: cons.name,
+        description: cons.description,
+        emoji: cons.emoji,
+        cost: cons.cost,
+        rarity: cons.rarity,
+        category: isFood ? 'food' : 'hygiene',
+        subcategory: isFood ? 'Корм и Лакомства 🐟' : cons.type === 'soap' ? 'Мыло и Пенка 🧼' : 'Кошачьи Игрушки 🐭',
+        originalItem: cons
+      });
+    });
+
+    return products;
+  }, [allSkins]);
 
   const [checkoutPack, setCheckoutPack] = useState<typeof DONATION_PACKS[0] | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'maccat_pay_sheet' | 'processing' | 'success'>('idle');
@@ -84,16 +162,33 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
 
   if (!profile || !activeCat) return null;
 
-  const selectedSkin = allSkins.find((s) => s.id === selectedSkinId) || allSkins[0];
+  const selectedItem = React.useMemo(() => {
+    const found = shopProducts.find(p => p.id === selectedSkinId);
+    if (found) return found;
+    // Fallback to first product in current active category
+    const categoryProducts = shopProducts.filter(p => p.category === activeTab);
+    return categoryProducts[0] || shopProducts[0];
+  }, [shopProducts, selectedSkinId, activeTab]);
 
-  const filteredItems = allSkins.filter((item) => {
-    if (activeTab === 'skins') {
-      return !item.accessory;
-    } else if (activeTab === 'accessories') {
-      return !!item.accessory;
-    }
-    return false;
-  });
+  const categorizedProducts = React.useMemo<Record<string, ShopProduct[]>>(() => {
+    if (activeTab === 'topup') return {};
+    
+    const filtered = shopProducts.filter(p => p.category === activeTab);
+    
+    // Group by subcategory
+    const groups: Record<string, ShopProduct[]> = {};
+    filtered.forEach(p => {
+      const sub = p.subcategory || 'Общие';
+      if (!groups[sub]) {
+        groups[sub] = [];
+      }
+      groups[sub].push(p);
+    });
+    
+    return groups;
+  }, [shopProducts, activeTab]);
+
+  const isConsumableProduct = selectedItem.category === 'food' || selectedItem.category === 'hygiene';
 
   const getRarityStyle = (rarity: string) => {
     switch (rarity) {
@@ -117,9 +212,9 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
     }
   };
 
-  const isAccessory = !!selectedSkin.accessory;
-  const previewSkin = isAccessory ? activeCat.skinId : selectedSkin.id;
-  const previewAccessory = isAccessory ? selectedSkin.accessory : (activeCat as any).accessory;
+  const isAccessory = selectedItem.category === 'accessories';
+  const previewSkin = isAccessory ? activeCat.skinId : selectedItem.id;
+  const previewAccessory = isAccessory ? (selectedItem.originalItem as any).accessory : (activeCat as any).accessory;
 
   const activeSkinColors = () => {
     const s = allSkins.find((item) => item.id === previewSkin);
@@ -246,73 +341,137 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
         
         {activeTab !== 'topup' && (
           <div className="w-full lg:w-60 bg-black/25 border-b lg:border-b-0 lg:border-r border-white/5 p-4 flex flex-col items-center justify-center text-center shrink-0 max-lg:py-3">
-            <span className="text-[9px] font-mono tracking-wider text-slate-400 uppercase mb-2 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
-              Кабина примерки
-            </span>
+            {isConsumableProduct ? (
+              <>
+                <span className="text-[9px] font-mono tracking-wider text-slate-400 uppercase mb-2 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                  Карточка товара
+                </span>
 
-            <div className="w-32 h-32 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center shadow-inner relative overflow-hidden">
-              <CatRenderer
-                breed={isAccessory ? activeCat.breed : selectedSkin.breed}
-                color={colors.color}
-                patternColor={colors.patternColor}
-                eyeColor={colors.eyeColor}
-                accessory={previewAccessory}
-                status="idle"
-                size={110}
-              />
-            </div>
+                <div className="w-32 h-32 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center justify-center shadow-inner relative overflow-hidden animate-fade-in">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10" />
+                  <span className="text-6xl filter drop-shadow-md animate-pulse">{selectedItem.emoji}</span>
+                  <div className="absolute bottom-2 bg-black/50 border border-white/10 px-2 py-0.5 rounded-full text-[9px] text-slate-300 font-mono">
+                    В запасе: <span className="font-bold text-amber-300">{profile.inventory?.[selectedItem.id] || 0} шт</span>
+                  </div>
+                </div>
 
-            <h3 className="text-xs font-bold text-white mt-3">{selectedSkin.name}</h3>
-            
-            <div className={`mt-1 px-2 py-0.5 rounded text-[8px] font-black border uppercase tracking-wider ${getRarityStyle(selectedSkin.rarity)}`}>
-              {getRarityLabel(selectedSkin.rarity)}
-            </div>
+                <h3 className="text-xs font-bold text-white mt-3">{selectedItem.name}</h3>
+                
+                <div className={`mt-1 px-2 py-0.5 rounded text-[8px] font-black border uppercase tracking-wider ${getRarityStyle(selectedItem.rarity)}`}>
+                  {getRarityLabel(selectedItem.rarity)}
+                </div>
 
-            <p className="text-[10px] text-slate-400 mt-1 max-w-xs leading-normal max-lg:hidden">
-              {selectedSkin.description}
-            </p>
+                <div className="mt-2.5 space-y-1 bg-white/5 border border-white/5 p-2 rounded-xl w-full text-left text-[10px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Действие:</span>
+                    <span className="font-extrabold text-white">
+                      {(selectedItem.originalItem as any).type === 'food' ? '🍗 Насыщение' : (selectedItem.originalItem as any).type === 'soap' ? '🧼 Гигиена' : '🎾 Радость'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Эффект:</span>
+                    <span className="font-extrabold text-emerald-400">+{(selectedItem.originalItem as any).boost}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Опыт кота:</span>
+                    <span className="font-extrabold text-sky-400">+{(selectedItem.originalItem as any).xpBoost} XP</span>
+                  </div>
+                </div>
 
-            <div className="w-full mt-3">
-              {profile.unlockedSkins.includes(selectedSkin.id) ? (
-                <button
-                  onClick={() => onApply(activeCat.id, selectedSkin.id)}
-                  className={`w-full py-3 rounded-xl font-bold text-[11px] cursor-pointer flex items-center justify-center gap-1.5 transition-all active:scale-95 border min-h-[44px] ${
-                    activeCat.skinId === selectedSkin.id || (isAccessory && (activeCat as any).accessory === selectedSkin.accessory)
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-black'
-                      : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
-                  }`}
-                >
-                  {activeCat.skinId === selectedSkin.id || (isAccessory && (activeCat as any).accessory === selectedSkin.accessory) ? (
-                    <>
-                      <Check size={11} />
-                      <span>Надето</span>
-                    </>
+                <p className="text-[10px] text-slate-400 mt-2 max-w-xs leading-normal max-lg:hidden">
+                  {selectedItem.description}
+                </p>
+
+                <div className="w-full mt-3">
+                  <button
+                    onClick={() => {
+                      triggerHaptic();
+                      onPurchase(selectedItem.id);
+                    }}
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-[11px] cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95 border border-emerald-400/15 shadow-lg shadow-emerald-500/10 min-h-[44px]"
+                  >
+                    <ShoppingBag size={11} />
+                    <span>Купить за 🐾 {selectedItem.cost}</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="text-[9px] font-mono tracking-wider text-slate-400 uppercase mb-2 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                  Кабина примерки
+                </span>
+
+                <div className="w-32 h-32 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center shadow-inner relative overflow-hidden">
+                  <CatRenderer
+                    breed={isAccessory ? activeCat.breed : (selectedItem.originalItem as any).breed}
+                    color={colors.color}
+                    patternColor={colors.patternColor}
+                    eyeColor={colors.eyeColor}
+                    accessory={previewAccessory}
+                    status="idle"
+                    size={110}
+                  />
+                </div>
+
+                <h3 className="text-xs font-bold text-white mt-3">{selectedItem.name}</h3>
+                
+                <div className={`mt-1 px-2 py-0.5 rounded text-[8px] font-black border uppercase tracking-wider ${getRarityStyle(selectedItem.rarity)}`}>
+                  {getRarityLabel(selectedItem.rarity)}
+                </div>
+
+                <p className="text-[10px] text-slate-400 mt-1 max-w-xs leading-normal max-lg:hidden">
+                  {selectedItem.description}
+                </p>
+
+                <div className="w-full mt-3">
+                  {profile.unlockedSkins.includes(selectedItem.id) ? (
+                    <button
+                      onClick={() => {
+                        triggerHaptic();
+                        onApply(activeCat.id, selectedItem.id);
+                      }}
+                      className={`w-full py-3 rounded-xl font-bold text-[11px] cursor-pointer flex items-center justify-center gap-1.5 transition-all active:scale-95 border min-h-[44px] ${
+                        activeCat.skinId === selectedItem.id || (isAccessory && (activeCat as any).accessory === selectedItem.originalItem.accessory)
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-black'
+                          : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
+                      }`}
+                    >
+                      {activeCat.skinId === selectedItem.id || (isAccessory && (activeCat as any).accessory === selectedItem.originalItem.accessory) ? (
+                        <>
+                          <Check size={11} />
+                          <span>Надето</span>
+                        </>
+                      ) : (
+                        <span>Надеть</span>
+                      )}
+                    </button>
                   ) : (
-                    <span>Надеть</span>
+                    <button
+                      onClick={() => {
+                        triggerHaptic();
+                        onPurchase(selectedItem.id);
+                      }}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-extrabold text-[11px] cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95 border border-sky-400/15 shadow-lg shadow-sky-500/10 min-h-[44px]"
+                    >
+                      <ShoppingBag size={11} />
+                      <span>Купить за 🐾 {selectedItem.cost}</span>
+                    </button>
                   )}
-                </button>
-              ) : (
-                <button
-                  onClick={() => onPurchase(selectedSkin.id)}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-extrabold text-[11px] cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95 border border-sky-400/15 shadow-lg shadow-sky-500/10 min-h-[44px]"
-                >
-                  <ShoppingBag size={11} />
-                  <span>Купить за 🐾 {selectedSkin.cost}</span>
-                </button>
-              )}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
         <div className="flex-1 overflow-y-auto flex flex-col bg-slate-950/20 p-4 md:p-5">
-          <div className="flex bg-black/40 border border-white/5 rounded-xl p-0.5 max-w-md self-center lg:self-start mb-4 text-[11px] font-bold">
+          <div className="flex bg-black/40 border border-white/5 rounded-xl p-0.5 max-w-md self-center lg:self-start mb-4 text-[11px] font-bold overflow-x-auto">
             <button
               onClick={() => {
                 setActiveTab('skins');
-                const firstSkin = allSkins.find(s => !s.accessory);
+                const firstSkin = shopProducts.find(p => p.category === 'skins');
                 if (firstSkin) setSelectedSkinId(firstSkin.id);
               }}
-              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] ${
+              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] whitespace-nowrap ${
                 activeTab === 'skins' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -321,18 +480,42 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
             <button
               onClick={() => {
                 setActiveTab('accessories');
-                const firstAcc = allSkins.find(s => s.accessory);
+                const firstAcc = shopProducts.find(p => p.category === 'accessories');
                 if (firstAcc) setSelectedSkinId(firstAcc.id);
               }}
-              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] ${
+              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] whitespace-nowrap ${
                 activeTab === 'accessories' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Аксессуары
             </button>
             <button
+              onClick={() => {
+                setActiveTab('food');
+                const firstFood = shopProducts.find(p => p.category === 'food');
+                if (firstFood) setSelectedSkinId(firstFood.id);
+              }}
+              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] whitespace-nowrap ${
+                activeTab === 'food' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Питание
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('hygiene');
+                const firstHyg = shopProducts.find(p => p.category === 'hygiene');
+                if (firstHyg) setSelectedSkinId(firstHyg.id);
+              }}
+              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] whitespace-nowrap ${
+                activeTab === 'hygiene' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Гигиена
+            </button>
+            <button
               onClick={() => setActiveTab('topup')}
-              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 min-h-[44px] ${
+              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 min-h-[44px] whitespace-nowrap ${
                 activeTab === 'topup' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -341,53 +524,82 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
           </div>
 
           {activeTab !== 'topup' ? (
-            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 pb-3">
-              {filteredItems.map((item) => {
-                const isSelected = item.id === selectedSkinId;
-                const isUnlocked = profile.unlockedSkins.includes(item.id);
-                const isEquipped = activeCat.skinId === item.id || (item.accessory && (activeCat as any).accessory === item.accessory);
-
+            <div className="flex-1 flex flex-col space-y-6 pb-3">
+              {Object.entries(categorizedProducts).map(([subcatName, productsValue]) => {
+                const products = productsValue as ShopProduct[];
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => setSelectedSkinId(item.id)}
-                    className={`relative p-3 rounded-2xl border transition-all cursor-pointer flex flex-col items-center text-center justify-between group h-[135px] ${
-                      isSelected
-                        ? 'bg-sky-500/10 border-sky-500 shadow-md'
-                        : 'bg-white/5 border-transparent hover:bg-white/10'
-                    }`}
-                  >
-                    {isEquipped && (
-                      <div className="absolute top-1.5 left-1.5 bg-emerald-500 text-white font-extrabold text-[7px] px-1 py-0.5 rounded uppercase tracking-wider">
-                        Надето
-                      </div>
-                    )}
+                  <div key={subcatName} className="space-y-2">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-white/5 pb-1 flex items-center gap-1.5">
+                      <Sparkle size={10} className="text-sky-400" />
+                      {subcatName} ({products.length})
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {products.map((item) => {
+                        const isSelected = item.id === selectedSkinId;
+                        const isConsumable = item.category === 'food' || item.category === 'hygiene';
+                        const currentQty = profile.inventory?.[item.id] || 0;
+                        
+                        const isUnlocked = profile.unlockedSkins.includes(item.id);
+                        const isEquipped = activeCat.skinId === item.id || ((item.originalItem as any).accessory && (activeCat as any).accessory === (item.originalItem as any).accessory);
 
-                    {isUnlocked && !isEquipped && (
-                      <div className="absolute top-1.5 right-1.5 bg-slate-500/10 text-slate-300 border border-slate-500/20 text-[7px] font-bold px-1 rounded uppercase">
-                        В шкафу
-                      </div>
-                    )}
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              triggerHaptic();
+                              setSelectedSkinId(item.id);
+                            }}
+                            className={`relative p-3 rounded-2xl border transition-all cursor-pointer flex flex-col items-center text-center justify-between group h-[135px] ${
+                              isSelected
+                                ? 'bg-sky-500/10 border-sky-500 shadow-md'
+                                : 'bg-white/5 border-transparent hover:bg-white/10'
+                            }`}
+                          >
+                            {isConsumable && currentQty > 0 && (
+                              <div className="absolute top-1.5 left-1.5 bg-amber-500 text-black font-extrabold text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                {currentQty} шт
+                              </div>
+                            )}
 
-                    <div className="w-14 h-14 rounded-xl bg-black/40 flex items-center justify-center my-1.5 group-hover:scale-105 transition-transform overflow-hidden relative">
-                      <CatRenderer
-                        breed={item.accessory ? activeCat.breed : item.breed}
-                        color={item.accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).color : item.color}
-                        patternColor={item.accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).patternColor : item.patternColor}
-                        eyeColor={item.accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).eyeColor : item.eyeColor}
-                        accessory={item.accessory ? item.accessory : undefined}
-                        status="idle"
-                        size={64}
-                      />
+                            {!isConsumable && isEquipped && (
+                              <div className="absolute top-1.5 left-1.5 bg-emerald-500 text-white font-extrabold text-[7px] px-1 py-0.5 rounded uppercase tracking-wider">
+                                Надето
+                              </div>
+                            )}
+
+                            {!isConsumable && isUnlocked && !isEquipped && (
+                              <div className="absolute top-1.5 right-1.5 bg-slate-500/10 text-slate-300 border border-slate-500/20 text-[7px] font-bold px-1 rounded uppercase">
+                                В шкафу
+                              </div>
+                            )}
+
+                            <div className="w-14 h-14 rounded-xl bg-black/40 flex items-center justify-center my-1.5 group-hover:scale-105 transition-transform overflow-hidden relative">
+                              {isConsumable ? (
+                                <span className="text-3xl">{item.emoji}</span>
+                              ) : (
+                                <CatRenderer
+                                  breed={(item.originalItem as any).accessory ? activeCat.breed : (item.originalItem as Skin).breed}
+                                  color={(item.originalItem as any).accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).color : (item.originalItem as Skin).color}
+                                  patternColor={(item.originalItem as any).accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).patternColor : (item.originalItem as Skin).patternColor}
+                                  eyeColor={(item.originalItem as any).accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).eyeColor : (item.originalItem as Skin).eyeColor}
+                                  accessory={(item.originalItem as any).accessory ? (item.originalItem as Skin).accessory : undefined}
+                                  status="idle"
+                                  size={64}
+                                />
+                              )}
+                            </div>
+
+                            <div className="w-full">
+                              <h4 className="text-[11px] font-bold text-slate-200 truncate leading-tight">{item.name}</h4>
+                              <p className="text-[9px] text-sky-400 font-extrabold font-mono mt-0.5">
+                                {isConsumable ? `🐾 ${item.cost}` : isUnlocked ? 'В наличии' : `🐾 ${item.cost}`}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-
-                    <div className="w-full">
-                      <h4 className="text-[11px] font-bold text-slate-200 truncate leading-tight">{item.name}</h4>
-                      <p className="text-[9px] text-sky-400 font-extrabold font-mono mt-0.5">
-                        {isUnlocked ? 'В наличии' : `🐾 ${item.cost}`}
-                      </p>
-                    </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

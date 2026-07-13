@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { useGameState } from './hooks/useGameState';
+import { FirebaseLogger } from './utils/FirebaseLogger';
 import { MenuBar } from './components/MenuBar';
 import { DynamicIsland } from './components/DynamicIsland';
 import { SwiftUIWidgets } from './components/SwiftUIWidgets';
@@ -10,6 +11,7 @@ import { QuestsWindow } from './components/QuestsWindow';
 import { AnalyticsWindow } from './components/AnalyticsWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import { AntistressWindow } from './components/AntistressWindow';
+import { CalendarWindow } from './components/CalendarWindow';
 import { Onboarding } from './components/Onboarding';
 import { Dock } from './components/Dock';
 import { DesktopBackground } from './components/DesktopBackground';
@@ -77,6 +79,7 @@ export default function App() {
     removeNotification,
     addPaws,
     claimReviewReward,
+    claimStreakMilestone,
     updateWallpaper,
     petCatClick,
     burstPopIt,
@@ -129,60 +132,14 @@ export default function App() {
     setUsersList(users);
   }, []);
 
-  // Синхронизация профиля с Firebase (без блокировок)
-  const syncProfileToFirestore = useCallback(async (profileData: any) => {
-    if (!profileData) return false;
-    if (isSyncing) {
-      console.log('⏳ Синхронизация уже выполняется');
-      return false;
-    }
-    setIsSyncing(true);
-    try {
-      console.log('📡 Синхронизация с Firebase...', profileData.nickname);
-      
-      const userData = {
-        nickname: profileData.nickname,
-        paws: profileData.paws,
-        cats: profileData.cats,
-        unlockedSkins: profileData.unlockedSkins,
-        level: Math.max(0, ...profileData.cats.map((c: any) => c.level || 1)),
-        isAdmin: profileData.isAdmin || false,
-        blocked: profileData.blocked || false,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Используем nickname как ID документа
-      const userRef = doc(db, USERS_COLLECTION, profileData.nickname);
-      await setDoc(userRef, userData, { merge: true });
-
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setLastSyncTime(timeStr);
-      localStorage.setItem('lastSyncTime', timeStr);
-      localStorage.setItem('maccat_profile', JSON.stringify(profileData));
-      
-      console.log('✅ Синхронизация с Firebase завершена');
-      return true;
-    } catch (error) {
-      console.error('❌ Ошибка синхронизации с Firebase:', error);
-      return false;
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isSyncing]);
-
   // Ручная синхронизация (из меню или настроек)
   const handleManualSync = useCallback(async () => {
-    const currentProfile = profile || offlineProfile;
-    if (!currentProfile) {
-      console.warn('⚠️ Нет профиля для синхронизации');
-      return;
-    }
-    await syncProfileToFirestore(currentProfile);
+    FirebaseLogger.log('info', 'Ручная синхронизация запущена из меню настроек App.tsx');
+    await originalTriggerCloudSync();
     if (isAdminMode) {
       await fetchUsersList();
     }
-  }, [profile, offlineProfile, syncProfileToFirestore, isAdminMode, fetchUsersList]);
+  }, [originalTriggerCloudSync, isAdminMode, fetchUsersList]);
 
   // При входе в админ-режим загружаем список
   useEffect(() => {
@@ -191,39 +148,29 @@ export default function App() {
     }
   }, [isAdminMode, fetchUsersList]);
 
-  // Автосохранение каждую минуту (только если синхронизация не занята)
+  // Автосохранение в локальный кэш каждую минуту
   useEffect(() => {
     if (!profile) return;
     if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     syncIntervalRef.current = setInterval(async () => {
-      if (isSyncing) return;
       localStorage.setItem('maccat_profile', JSON.stringify(profile));
-      await syncProfileToFirestore(profile);
-      if (isAdminMode) fetchUsersList();
     }, 60000);
     return () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
-  }, [profile, syncProfileToFirestore, isAdminMode, fetchUsersList, isSyncing]);
+  }, [profile]);
 
-  // ОДНОКРАТНАЯ ПЕРВИЧНАЯ СИНХРОНИЗАЦИЯ (запускается один раз)
+  // ОДНОКРАТНАЯ ПЕРВИЧНАЯ СИНХРОНИЗАЦИЯ (запускается один раз при загрузке)
   const initialSyncDone = useRef(false);
   useEffect(() => {
     if (!profile) return;
     if (initialSyncDone.current) return;
     initialSyncDone.current = true;
-    console.log('📤 Первичная синхронизация профиля...');
-    // Даём задержку, чтобы интерфейс отрисовался
+    FirebaseLogger.log('info', 'Запуск первичной синхронизации при входе в игру...');
     setTimeout(() => {
-      syncProfileToFirestore(profile).then((success) => {
-        if (success) {
-          console.log('✅ Первичная синхронизация завершена');
-        } else {
-          console.warn('⚠️ Первичная синхронизация не удалась');
-        }
-      });
-    }, 500);
-  }, [profile, syncProfileToFirestore]);
+      originalTriggerCloudSync();
+    }, 1000);
+  }, [profile, originalTriggerCloudSync]);
 
   // Звуки, тема и остальные хуки (без изменений)
   useEffect(() => {
@@ -471,9 +418,9 @@ export default function App() {
   }
 
   const syncProps = {
-    syncing: isSyncing,
+    syncing: syncingState,
     onSync: handleManualSync,
-    lastSyncedTime: lastSyncTime,
+    lastSyncedTime: lastSyncedTime,
   };
 
   return (
@@ -690,6 +637,16 @@ export default function App() {
                 onMinimize={() => handleMinimizeWindow('antistress')}
                 onAddPaws={(amount) => addPaws(amount, false)}
                 onAddDiaryEntry={addDiaryEntry}
+              />
+            )}
+
+            {openWindows.includes('calendar') && !minimizedWindows.includes('calendar') && (
+              <CalendarWindow
+                key="calendar"
+                profile={displayProfile}
+                onClaimMilestone={claimStreakMilestone}
+                onClose={() => handleCloseWindow('calendar')}
+                onMinimize={() => handleMinimizeWindow('calendar')}
               />
             )}
           </AnimatePresence>

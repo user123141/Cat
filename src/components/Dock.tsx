@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat } from 'lucide-react';
+import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat, Calendar } from 'lucide-react';
 
 interface DockProps {
   activeWindow: string | null;
@@ -11,6 +11,7 @@ interface DockProps {
 export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOpenWindow }) => {
   const dockItems = [
     { id: 'cats', label: 'Котята', icon: <Cat size={26} className="text-slate-700 dark:text-slate-300" /> },
+    { id: 'calendar', label: 'Календарь', icon: <Calendar size={26} className="text-orange-500 animate-pulse" /> },
     { id: 'antistress', label: 'Антистресс', icon: <Sparkles size={26} className="text-amber-500" /> },
     { id: 'shop', label: 'Магазин', icon: <ShoppingBag size={26} className="text-purple-600 dark:text-purple-400" /> },
     { id: 'quests', label: 'Задания', icon: <Target size={26} className="text-rose-500" /> },

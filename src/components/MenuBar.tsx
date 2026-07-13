@@ -30,8 +30,6 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   const [time, setTime] = useState(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
-  const [isCharging, setIsCharging] = useState<boolean>(false);
   const [showStatusIndicator, setShowStatusIndicator] = useState(false);
   const [prevOnline, setPrevOnline] = useState(isOnline);
 
@@ -45,30 +43,6 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       }
     }
   }, [isOnline, prevOnline]);
-
-  useEffect(() => {
-    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
-      (navigator as any).getBattery().then((battery: any) => {
-        const updateBattery = () => {
-          setBatteryLevel(Math.round(battery.level * 100));
-          setIsCharging(battery.charging);
-        };
-        updateBattery();
-        battery.addEventListener('chargingchange', updateBattery);
-        battery.addEventListener('levelchange', updateBattery);
-        return () => {
-          battery.removeEventListener('chargingchange', updateBattery);
-          battery.removeEventListener('levelchange', updateBattery);
-        };
-      }).catch(() => {
-        setBatteryLevel(88);
-        setIsCharging(false);
-      });
-    } else {
-      setBatteryLevel(88);
-      setIsCharging(false);
-    }
-  }, []);
 
   const getSecondsUntilMidnight = () => {
     const now = new Date();
@@ -165,28 +139,6 @@ export const MenuBar: React.FC<MenuBarProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-
-        {batteryLevel !== null && (
-          <div className="flex items-center gap-1.5 px-0.5 py-0 text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-300 font-mono font-semibold cursor-default select-none shrink-0">
-            <span className="hidden xs:inline">{batteryLevel}%</span>
-            <div className="relative w-[22px] h-[11px] border-[1.2px] border-slate-500 dark:border-slate-400 rounded-[2px] p-[1px] flex items-center bg-black/10 dark:bg-white/5">
-              <div 
-                className={`h-full rounded-[1px] transition-all duration-500 ${
-                  isCharging ? 'bg-[#34C759]' : batteryLevel < 20 ? 'bg-[#FF3B30]' : batteryLevel < 40 ? 'bg-[#FF9500]' : 'bg-slate-700 dark:bg-slate-200'
-                }`} 
-                style={{ width: `${Math.max(10, batteryLevel)}%` }}
-              />
-              <div className="absolute -right-[2px] top-[1.5px] w-[1.2px] h-[4.5px] bg-slate-500 dark:bg-slate-400 rounded-r-[0.8px]" />
-              {isCharging && (
-                <svg viewBox="0 0 10 10" className="absolute inset-0 m-auto w-[5px] h-[5px] text-slate-900 dark:text-white fill-current animate-pulse">
-                  <path d="M5.5 1L2 5.5h3L4.5 9 8 4.5H5z" />
-                </svg>
-              )}
-            </div>
-          </div>
-        )}
-
-        <span className="text-slate-300 dark:text-slate-600 text-[8px]">|</span>
 
         <div 
           onClick={() => { triggerHaptic(); setIsCalendarOpen(!isCalendarOpen); }}

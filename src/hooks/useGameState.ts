@@ -1,27 +1,30 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Cat, PlayerProfile, DailyQuest, Skin, NotificationItem, GameAnalytics, DiaryEntry } from '../types';
+import { db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { FirebaseLogger } from '../utils/FirebaseLogger';
 
 export const INITIAL_SKINS: Skin[] = [
   // Породы котиков
   { id: 'scottish_pink', name: 'Скоттиш Персик', description: 'Милейшая нежная шубка нежно-розового оттенка.', cost: 0, breed: 'Scottish Fold', color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9', rarity: 'common' },
-  { id: 'british_blue', name: 'Голубой Британец', description: 'Густой бархатный серо-голубой велюровый покров.', cost: 60, breed: 'British Shorthair', color: '#64748b', patternColor: '#475569', eyeColor: '#f59e0b', rarity: 'common' },
-  { id: 'siamese_point', name: 'Королевский Сиам', description: 'Изящный песочный окрас с благородной шоколадной маской.', cost: 120, breed: 'Siamese', color: '#fef3c7', patternColor: '#78350f', eyeColor: '#06b6d4', rarity: 'rare' },
-  { id: 'sphynx_naked', name: 'Розовый Сфинкс', description: 'Элегантная бархатная кожа, полностью лишенная шерсти.', cost: 180, breed: 'Sphynx', color: '#fda4af', patternColor: '#f43f5e', eyeColor: '#10b981', rarity: 'epic' },
-  { id: 'persian_gold', name: 'Золотистый Перс', description: 'Невероятно пушистый королевский мех цвета солнца.', cost: 220, breed: 'Persian', color: '#fef08a', patternColor: '#eab308', eyeColor: '#a855f7', rarity: 'epic' },
-  { id: 'bombay_black', name: 'Бомбейская Пантера', description: 'Идеально гладкий, угольно-черный мех, переливающийся на солнце.', cost: 280, breed: 'Bombay', color: '#1e293b', patternColor: '#0f172a', eyeColor: '#f59e0b', rarity: 'rare' },
-  { id: 'bengal_leopard', name: 'Дикий Бенгал', description: 'Экзотические леопардовые пятна и дикий гордый взгляд.', cost: 380, breed: 'Bengal', color: '#f59e0b', patternColor: '#78350f', eyeColor: '#10b981', rarity: 'epic' },
-  { id: 'sakura_dream', name: 'Лепесток Сакуры', description: 'Волшебная бело-розовая шубка с узором цветущей вишни.', cost: 500, breed: 'Sakura Neko', color: '#fff1f2', patternColor: '#fda4af', eyeColor: '#ec4899', rarity: 'legendary' },
-  { id: 'galaxy_cat', name: 'Космическая Небула', description: 'Звездный космический мех, сияющий всеми цветами галактики.', cost: 750, breed: 'Galaxy Cat', color: '#312e81', patternColor: '#6366f1', eyeColor: '#a855f7', rarity: 'legendary' },
+  { id: 'british_blue', name: 'Голубой Британец', description: 'Густой бархатный серо-голубой велюровый покров.', cost: 240, breed: 'British Shorthair', color: '#64748b', patternColor: '#475569', eyeColor: '#f59e0b', rarity: 'common' },
+  { id: 'siamese_point', name: 'Королевский Сиам', description: 'Изящный песочный окрас с благородной шоколадной маской.', cost: 380, breed: 'Siamese', color: '#fef3c7', patternColor: '#78350f', eyeColor: '#06b6d4', rarity: 'rare' },
+  { id: 'sphynx_naked', name: 'Розовый Сфинкс', description: 'Элегантная бархатная кожа, полностью лишенная шерсти.', cost: 650, breed: 'Sphynx', color: '#fda4af', patternColor: '#f43f5e', eyeColor: '#10b981', rarity: 'epic' },
+  { id: 'persian_gold', name: 'Золотистый Перс', description: 'Невероятно пушистый королевский мех цвета солнца.', cost: 800, breed: 'Persian', color: '#fef08a', patternColor: '#eab308', eyeColor: '#a855f7', rarity: 'epic' },
+  { id: 'bombay_black', name: 'Бомбейская Пантера', description: 'Идеально гладкий, угольно-черный мех, переливающийся на солнце.', cost: 700, breed: 'Bombay', color: '#1e293b', patternColor: '#0f172a', eyeColor: '#f59e0b', rarity: 'rare' },
+  { id: 'bengal_leopard', name: 'Дикий Бенгал', description: 'Экзотические леопардовые пятна и дикий гордый взгляд.', cost: 1200, breed: 'Bengal', color: '#f59e0b', patternColor: '#78350f', eyeColor: '#10b981', rarity: 'epic' },
+  { id: 'sakura_dream', name: 'Лепесток Сакуры', description: 'Волшебная бело-розовая шубка с узором цветущей вишни.', cost: 1800, breed: 'Sakura Neko', color: '#fff1f2', patternColor: '#fda4af', eyeColor: '#ec4899', rarity: 'legendary' },
+  { id: 'galaxy_cat', name: 'Космическая Небула', description: 'Звездный космический мех, сияющий всеми цветами галактики.', cost: 2900, breed: 'Galaxy Cat', color: '#312e81', patternColor: '#6366f1', eyeColor: '#a855f7', rarity: 'legendary' },
   
   // Аксессуары
-  { id: 'collar_bell', name: 'Ошейник с Бубенчиком', description: 'Традиционный красный ремешок с сияющим золотым колокольчиком.', cost: 40, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'collar_bell', rarity: 'common' },
-  { id: 'cool_glasses', name: 'Кибер Очки', description: 'Стильные темные очки для самых уверенных в себе котиков.', cost: 90, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'cool_glasses', rarity: 'rare' },
-  { id: 'bow_tie', name: 'Джентльменская Бабочка', description: 'Красная шелковая бабочка для праздничных и элегантных моментов.', cost: 75, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'bow_tie', rarity: 'rare' },
-  { id: 'gold_crown', name: 'Императорская Корона', description: 'Корона из чистейшего золота для истинного правителя вашей комнаты.', cost: 350, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'gold_crown', rarity: 'legendary' },
-  { id: 'wizard_hat', name: 'Колпак Волшебника', description: 'Синяя шляпа со звездами, наделяющая кота магией мурчания.', cost: 420, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'wizard_hat', rarity: 'legendary' },
-  { id: 'santa_hat', name: 'Новогодний Колпак', description: 'Уютная зимняя шапочка с пушистым белым помпоном.', cost: 100, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'santa_hat', rarity: 'common' },
-  { id: 'detective_hat', name: 'Шерлок Кот', description: 'Клетчатая шляпа для любителей раскрывать тайны пропавших вкусняшек.', cost: 150, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'detective_hat', rarity: 'epic' },
-  { id: 'party_hat', name: 'Праздничный Колпак', description: 'Смешной яркий колпачок для весёлых дней рождений.', cost: 35, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'party_hat', rarity: 'common' },
+  { id: 'collar_bell', name: 'Ошейник с Бубенчиком', description: 'Традиционный красный ремешок с сияющим золотым колокольчиком.', cost: 120, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'collar_bell', rarity: 'common' },
+  { id: 'cool_glasses', name: 'Кибер Очки', description: 'Стильные темные очки для самых уверенных в себе котиков.', cost: 320, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'cool_glasses', rarity: 'rare' },
+  { id: 'bow_tie', name: 'Джентльменская Бабочка', description: 'Красная шелковая бабочка для праздничных и элегантных моментов.', cost: 280, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'bow_tie', rarity: 'rare' },
+  { id: 'gold_crown', name: 'Императорская Корона', description: 'Корона из чистейшего золота для истинного правителя вашей комнаты.', cost: 1400, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'gold_crown', rarity: 'legendary' },
+  { id: 'wizard_hat', name: 'Колпак Волшебника', description: 'Синяя шляпа со звездами, наделяющая кота магией мурчания.', cost: 1800, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'wizard_hat', rarity: 'legendary' },
+  { id: 'santa_hat', name: 'Новогодний Колпак', description: 'Уютная зимняя шапочка с пушистым белым помпоном.', cost: 240, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'santa_hat', rarity: 'common' },
+  { id: 'detective_hat', name: 'Шерлок Кот', description: 'Клетчатая шляпа для любителей раскрывать тайны пропавших вкусняшек.', cost: 450, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'detective_hat', rarity: 'epic' },
+  { id: 'party_hat', name: 'Праздничный Колпак', description: 'Смешной яркий колпачок для весёлых дней рождений.', cost: 110, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'party_hat', rarity: 'common' },
 ];
 
 // Процедурно сгенерированные 100+ эксклюзивных предметов для магазина Care OS
@@ -34,7 +37,7 @@ const generateExtraSkins = (): Skin[] => {
     { key: 'glasses', name: 'Очки "Стиляга"', desc: 'Премиальные темные очки для защиты глаз от солнца.', icon: '🕶️' },
     { key: 'scarf', name: 'Теплый Шарф', desc: 'Уютный вязаный шарфик ручной работы.', icon: '🧣' },
     { key: 'ribbon', name: 'Шелковый Бантик', desc: 'Крутой праздничный бантик на шею питомца.', icon: '🎀' },
-    { key: 'headphones', name: 'Геймерские Наушники', desc: 'Наушники со светящимися кошачьими ушками.', icon: '🎧' },
+    { key: 'headphones', name: 'Геймерские Наушники', desc: 'Наушники со светящимися кошачьи ушками.', icon: '🎧' },
     { key: 'boots', name: 'Милые Тапочки', desc: 'Мягкие теплые сапожки на лапки.', icon: '🥾' },
     { key: 'halo', name: 'Нимб Ангелочка', desc: 'Светящийся парящий нимб для самых послушных.', icon: '😇' },
     { key: 'wings', name: 'Крылья Бабочки', desc: 'Миниатюрные крылышки для легкой левитации.', icon: '🦋' },
@@ -49,7 +52,7 @@ const generateExtraSkins = (): Skin[] => {
     const colorIdx = Math.floor(i / 5) % colors.length;
     const colorName = colorsRu[colorIdx];
     const rarity = rarities[Math.floor(i / 13) % rarities.length];
-    const cost = 25 + (i * 5);
+    const cost = 120 + (i * 24);
 
     list.push({
       id: `gen_acc_${accType.key}_${i}`,
@@ -89,7 +92,7 @@ const generateExtraSkins = (): Skin[] => {
     const th = themes[themeIdx];
     const colorHex = colors[themeIdx % colors.length];
     const rarity = rarities[Math.floor(i / 13) % rarities.length];
-    const cost = 45 + (i * 7);
+    const cost = 250 + (i * 35);
 
     list.push({
       id: `gen_skin_${breedId.toLowerCase()}_${i}`,
@@ -109,6 +112,24 @@ const generateExtraSkins = (): Skin[] => {
 
 export const ALL_SKINS_LIST: Skin[] = [...INITIAL_SKINS, ...generateExtraSkins()];
 
+export const CONSUMABLE_ITEMS: { id: string; name: string; emoji: string; description: string; cost: number; type: 'food' | 'soap' | 'toy'; boost: number; xpBoost: number; rarity: 'common' | 'rare' | 'epic' | 'legendary' }[] = [
+  // Еда (Голод)
+  { id: 'food_kibble', name: 'Премиум корм', emoji: '🎚️', description: 'Хрустящий сбалансированный сухой корм. Насыщает +20 сытости, дает +10 XP.', cost: 12, type: 'food', boost: 20, xpBoost: 10, rarity: 'common' },
+  { id: 'food_treat', name: 'Кремовое лакомство', emoji: '🧁', description: 'Нежное кошачье лакомство в тюбике. Восстанавливает +30 сытости и дает +15 XP.', cost: 18, type: 'food', boost: 30, xpBoost: 15, rarity: 'rare' },
+  { id: 'food_tuna', name: 'Филе дикого тунца', emoji: '🐟', description: 'Свежайший стейк из глубоководного тунца. Восстанавливает +45 сытости и дает +25 XP.', cost: 28, type: 'food', boost: 45, xpBoost: 25, rarity: 'epic' },
+  { id: 'food_steak', name: 'Сочный стейк Прайм', emoji: '🥩', description: 'Мраморная говядина высочайшего класса для котика. Дает +75 сытости и +45 XP!', cost: 45, type: 'food', boost: 75, xpBoost: 45, rarity: 'legendary' },
+
+  // Гигиена (Мыло)
+  { id: 'soap_lavender', name: 'Лавандовое мыло', emoji: '🧼', description: 'Мягкое мыло с экстрактом лаванды для расслабления. +25 гигиены, +12 XP.', cost: 15, type: 'soap', boost: 25, xpBoost: 12, rarity: 'common' },
+  { id: 'soap_minerals', name: 'Мыло с минералами', emoji: '🧴', description: 'Лечебная пенка с минералами Мертвого моря. +50 гигиены, +20 XP.', cost: 25, type: 'soap', boost: 50, xpBoost: 20, rarity: 'rare' },
+  { id: 'soap_charcoal', name: 'Угольный эко-шампунь', emoji: '🛁', description: 'Глубокое детокс-очищение шерстки до сияния. +85 гигиены, +35 XP!', cost: 45, type: 'soap', boost: 85, xpBoost: 35, rarity: 'epic' },
+
+  // Радость (Игрушки)
+  { id: 'toy_wand', name: 'Удочка-дразнилка', emoji: '🪶', description: 'Перо на веревочке для весёлых прыжков. +25 счастья, +15 XP, -8 энергии.', cost: 16, type: 'toy', boost: 25, xpBoost: 15, rarity: 'common' },
+  { id: 'toy_laser', name: 'Лазерная указка', emoji: '🔦', description: 'Неуловимая красная лазерная точка. +55 счастья, +30 XP, -15 энергии.', cost: 30, type: 'toy', boost: 55, xpBoost: 30, rarity: 'rare' },
+  { id: 'toy_catnip', name: 'Мышка с кошачьей мятой', emoji: '🐭', description: 'Игрушка с органической мятой для безумного счастья. +90 счастья, +50 XP!', cost: 50, type: 'toy', boost: 90, xpBoost: 50, rarity: 'epic' },
+];
+
 const INITIAL_QUESTS = (): DailyQuest[] => [
   { id: 'feed_3', text: 'Покормить котиков 3 раза', progress: 0, target: 3, completed: false, claimed: false, rewardPaws: 50, type: 'feed' },
   { id: 'play_2', text: 'Поиграть с котиками 2 раза', progress: 0, target: 2, completed: false, claimed: false, rewardPaws: 60, type: 'play' },
@@ -117,8 +138,165 @@ const INITIAL_QUESTS = (): DailyQuest[] => [
   { id: 'antistress_30', text: 'Лопнуть 30 пузырей в Pop It', progress: 0, target: 30, completed: false, claimed: false, rewardPaws: 45, type: 'antistress' },
 ];
 
+export const sendNativeNotification = (title: string, body: string) => {
+  if (typeof window !== 'undefined' && 'Notification' in window) {
+    if (Notification.permission === 'granted') {
+      try {
+        new Notification(title, {
+          body,
+          icon: '/icon-192.png',
+          tag: 'maccat_alert_' + title.replace(/\s+/g, '_'),
+        });
+      } catch (e) {
+        console.warn('Native notification failed:', e);
+      }
+    }
+  }
+};
+
 export const useGameState = () => {
-  const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [profile, setProfile] = useState<PlayerProfile | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const savedProfile = localStorage.getItem('maccat_profile');
+    if (!savedProfile) return null;
+    try {
+      const parsed: PlayerProfile = JSON.parse(savedProfile);
+      
+      // Миграция и заполнение недостающих новых полей
+      if (!parsed.unlockedAchievements) parsed.unlockedAchievements = [];
+      if (!parsed.currentWallpaper) parsed.currentWallpaper = 'ventura';
+      if (parsed.claimedReviewReward === undefined) parsed.claimedReviewReward = false;
+      if (parsed.clicksCount === undefined) parsed.clicksCount = 0;
+      if (parsed.popItBurstedCount === undefined) parsed.popItBurstedCount = 0;
+      if (parsed.keyboardClicksCount === undefined) parsed.keyboardClicksCount = 0;
+      if (!parsed.diary) parsed.diary = [];
+      if (!parsed.claimedStreakMilestones) parsed.claimedStreakMilestones = [];
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (!parsed.careCalendarHistory) {
+        parsed.careCalendarHistory = [todayStr];
+      } else if (!parsed.careCalendarHistory.includes(todayStr)) {
+        parsed.careCalendarHistory.push(todayStr);
+      }
+
+      if (parsed.unlockedSkins && !parsed.unlockedSkins.includes('scottish_pink')) {
+        parsed.unlockedSkins.push('scottish_pink');
+      }
+
+      if (!parsed.quests || parsed.quests.length === 0 || (parsed.quests[0].id.includes('feed') && !parsed.quests[0].text.includes('Покормить'))) {
+        parsed.quests = [
+          { id: 'feed_3', text: 'Покормить котиков 3 раза', progress: 0, target: 3, completed: false, claimed: false, rewardPaws: 50, type: 'feed' },
+          { id: 'play_2', text: 'Поиграть с котиками 2 раза', progress: 0, target: 2, completed: false, claimed: false, rewardPaws: 60, type: 'play' },
+          { id: 'clean_1', text: 'Искупать котика в ванне 1 раз', progress: 0, target: 1, completed: false, claimed: false, rewardPaws: 40, type: 'clean' },
+          { id: 'click_20', text: 'Погладить котика кликами 20 раз', progress: 0, target: 20, completed: false, claimed: false, rewardPaws: 35, type: 'click' },
+          { id: 'antistress_30', text: 'Лопнуть 30 пузырей в Pop It', progress: 0, target: 30, completed: false, claimed: false, rewardPaws: 45, type: 'antistress' },
+        ];
+      }
+
+      if (parsed.cats) {
+        parsed.cats = parsed.cats.map(cat => {
+          if (!cat.personality) {
+            const personalities: ('lazy' | 'playful' | 'hungry')[] = ['lazy', 'playful', 'hungry'];
+            cat.personality = personalities[Math.floor(Math.random() * personalities.length)];
+          }
+          return cat;
+        });
+      }
+
+      // Сброс квестов при новом дне
+      const today = new Date().toISOString().split('T')[0];
+      if (parsed.lastActiveDay !== today) {
+        parsed.quests = [
+          { id: 'feed_3', text: 'Покормить котиков 3 раза', progress: 0, target: 3, completed: false, claimed: false, rewardPaws: 50, type: 'feed' },
+          { id: 'play_2', text: 'Поиграть с котиками 2 раза', progress: 0, target: 2, completed: false, claimed: false, rewardPaws: 60, type: 'play' },
+          { id: 'clean_1', text: 'Искупать котика в ванне 1 раз', progress: 0, target: 1, completed: false, claimed: false, rewardPaws: 40, type: 'clean' },
+          { id: 'click_20', text: 'Погладить котика кликами 20 раз', progress: 0, target: 20, completed: false, claimed: false, rewardPaws: 35, type: 'click' },
+          { id: 'antistress_30', text: 'Лопнуть 30 пузырей в Pop It', progress: 0, target: 30, completed: false, claimed: false, rewardPaws: 45, type: 'antistress' },
+        ];
+        
+        if (parsed.lastActiveDay) {
+          const lastActiveDate = new Date(parsed.lastActiveDay);
+          const currentDate = new Date(today);
+          const diffTime = Math.abs(currentDate.getTime() - lastActiveDate.getTime());
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays === 1) {
+            parsed.streak = (parsed.streak || 0) + 1;
+          } else if (diffDays > 1) {
+            parsed.streak = 1;
+          }
+        } else {
+          parsed.streak = 1;
+        }
+        parsed.lastActiveDay = today;
+        parsed.paws += 30; // Ежедневный бонус
+      }
+
+      if (!parsed.inventory) {
+        parsed.inventory = {
+          'food_kibble': 3,
+          'soap_lavender': 2,
+          'toy_wand': 1
+        };
+      }
+
+      // --- РАСЧЕТ ОФФЛАЙН УПАДКА ПОКАЗАТЕЛЕЙ (DECAY) ---
+      if (parsed.lastSavedTime) {
+        const now = Date.now();
+        const elapsedSeconds = Math.max(0, (now - parsed.lastSavedTime) / 1000);
+        
+        if (elapsedSeconds > 45) {
+          const hours = elapsedSeconds / 3600;
+          parsed.cats = parsed.cats.map(cat => {
+            let { hunger, cleanliness, happiness, energy, status } = cat;
+            
+            if (status === 'sleeping') {
+              const sleepHoursToFull = Math.max(0, (100 - energy) / 25);
+              if (hours >= sleepHoursToFull) {
+                energy = 100;
+                status = 'idle';
+                const idleHours = hours - sleepHoursToFull;
+                hunger = Math.max(0, hunger - (8 * hours));
+                cleanliness = Math.max(0, cleanliness - (5 * hours));
+                energy = Math.max(0, energy - (6 * idleHours));
+                
+                const hungerPenalty = hunger < 30 ? 4 : 0;
+                const cleanPenalty = cleanliness < 30 ? 4 : 0;
+                happiness = Math.max(0, happiness - (6 * hours) - ((hungerPenalty + cleanPenalty) * idleHours));
+              } else {
+                energy = Math.min(100, energy + (25 * hours));
+                hunger = Math.max(0, hunger - (8 * hours));
+                cleanliness = Math.max(0, cleanliness - (5 * hours));
+                happiness = Math.max(0, happiness - (3 * hours));
+              }
+            } else {
+              hunger = Math.max(0, hunger - (8 * hours));
+              cleanliness = Math.max(0, cleanliness - (5 * hours));
+              energy = Math.max(0, energy - (6 * hours));
+              
+              const hungerPenalty = hunger < 30 ? 4 : 0;
+              const cleanPenalty = cleanliness < 30 ? 4 : 0;
+              happiness = Math.max(0, happiness - ((6 + hungerPenalty + cleanPenalty) * hours));
+            }
+            
+            return {
+              ...cat,
+              hunger: Math.round(hunger * 10) / 10,
+              cleanliness: Math.round(cleanliness * 10) / 10,
+              happiness: Math.round(happiness * 10) / 10,
+              energy: Math.round(energy * 10) / 10,
+              status
+            };
+          });
+        }
+      }
+
+      return parsed;
+    } catch (e) {
+      console.error('Failed to parse initial profile', e);
+      return null;
+    }
+  });
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [syncing, setSyncing] = useState<boolean>(false);
@@ -221,67 +399,33 @@ export const useGameState = () => {
       try {
         const parsed: PlayerProfile = JSON.parse(savedProfile);
         
-        // Миграция и заполнение недостающих новых полей
-        if (!parsed.unlockedAchievements) parsed.unlockedAchievements = [];
-        if (!parsed.currentWallpaper) parsed.currentWallpaper = 'ventura';
-        if (parsed.claimedReviewReward === undefined) parsed.claimedReviewReward = false;
-        if (parsed.clicksCount === undefined) parsed.clicksCount = 0;
-        if (parsed.popItBurstedCount === undefined) parsed.popItBurstedCount = 0;
-        if (parsed.keyboardClicksCount === undefined) parsed.keyboardClicksCount = 0;
-        if (!parsed.diary) parsed.diary = [];
-
-        // Если в сохраненных скинах нет стартового, добавим его
-        if (!parsed.unlockedSkins.includes('scottish_pink')) {
-          parsed.unlockedSkins.push('scottish_pink');
-        }
-
-        // Локализация квестов при загрузке, если они на английском
-        if (parsed.quests && parsed.quests.length > 0 && parsed.quests[0].id.includes('feed') && !parsed.quests[0].text.includes('Покормить')) {
-          parsed.quests = INITIAL_QUESTS();
-        } else if (!parsed.quests || parsed.quests.length === 0) {
-          parsed.quests = INITIAL_QUESTS();
-        }
-
-        // Миграция характеров котиков
-        if (parsed.cats) {
-          parsed.cats = parsed.cats.map(cat => {
-            if (!cat.personality) {
-              const personalities: ('lazy' | 'playful' | 'hungry')[] = ['lazy', 'playful', 'hungry'];
-              cat.personality = personalities[Math.floor(Math.random() * personalities.length)];
-            }
-            return cat;
-          });
-        }
-
-        // Сброс квестов, если наступил новый день, и точный расчет серии дней заботы
-        const today = new Date().toISOString().split('T')[0];
-        if (parsed.lastActiveDay !== today) {
-          parsed.quests = INITIAL_QUESTS();
+        // Показываем уведомления об упадке за время отсутствия
+        if (parsed.lastSavedTime) {
+          const now = Date.now();
+          const elapsedSeconds = Math.max(0, (now - parsed.lastSavedTime) / 1000);
           
-          if (parsed.lastActiveDay) {
-            const lastActiveDate = new Date(parsed.lastActiveDay);
-            const currentDate = new Date(today);
-            const diffTime = Math.abs(currentDate.getTime() - lastActiveDate.getTime());
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          if (elapsedSeconds > 45) {
+            const elapsedMins = Math.round(elapsedSeconds / 60);
             
-            if (diffDays === 1) {
-              parsed.streak = (parsed.streak || 0) + 1;
-            } else if (diffDays > 1) {
-              parsed.streak = 1; // Сброс, если пропустил день
-            }
-          } else {
-            parsed.streak = 1;
+            setTimeout(() => {
+              addNotification('С возвращением! 🐾', `Вас не было ${elapsedMins} мин. Показатели котиков обновились.`, 'info');
+              
+              if (profile && profile.cats) {
+                const criticalHungerCats = profile.cats.filter(c => c.hunger < 25).map(c => c.name);
+                const criticalCleanCats = profile.cats.filter(c => c.cleanliness < 25).map(c => c.name);
+                
+                if (criticalHungerCats.length > 0) {
+                  sendNativeNotification('Котики хотят кушать! 🐟', `${criticalHungerCats.join(', ')} проголодались за время вашего отсутствия! Покормите их.`);
+                }
+                if (criticalCleanCats.length > 0) {
+                  sendNativeNotification('Котики запачкались! 🧼', `${criticalCleanCats.join(', ')} нуждаются в мытье! Пора искупать котиков.`);
+                }
+              }
+            }, 1000);
           }
-          parsed.lastActiveDay = today;
-          
-          addNotification('Ежедневный бонус 🐾', `С возвращением! Серия дней входа: ${parsed.streak}. Получено +30 лапок!`, 'success');
-          parsed.paws += 30;
         }
-
-        const checkedProfile = checkForNewAchievements(parsed);
-        setProfile(checkedProfile);
       } catch (e) {
-        console.error('Error loading saved profile', e);
+        console.error('Error parsing profile for notifications:', e);
       }
     }
 
@@ -289,7 +433,7 @@ export const useGameState = () => {
       try {
         setAnalytics(JSON.parse(savedAnalytics));
       } catch (e) {
-        console.error('Error loading analytics', e);
+        console.error('Error loading analytics:', e);
       }
     }
 
@@ -314,7 +458,7 @@ export const useGameState = () => {
       window.removeEventListener('offline', handleOffline);
       if (playTimeIntervalRef.current) clearInterval(playTimeIntervalRef.current);
     };
-  }, [addNotification, checkForNewAchievements]);
+  }, [addNotification, profile]);
 
   // Синхронизация в localStorage
   useEffect(() => {
@@ -374,7 +518,16 @@ export const useGameState = () => {
       clicksCount: 0,
       popItBurstedCount: 0,
       keyboardClicksCount: 0,
-      diary: [firstCatAdoptEvent]
+      claimedStreakMilestones: [],
+      careCalendarHistory: [new Date().toISOString().split('T')[0]],
+      diary: [firstCatAdoptEvent],
+      foodCount: 5,
+      soapCount: 5,
+      inventory: {
+        'food_kibble': 5,
+        'soap_lavender': 3,
+        'toy_wand': 1
+      }
     };
 
     const checkedProfile = checkForNewAchievements(newProfile);
@@ -426,9 +579,15 @@ export const useGameState = () => {
         if (activeCat) {
           if (activeCat.hunger < 25 && Math.random() < 0.1) {
             addNotification('Котик проголодался! 🐟', `${activeCat.name} хочет кушать вкусную рыбку.`, 'warning');
+            sendNativeNotification('Котик проголодался! 🐟', `${activeCat.name} хочет кушать вкусный корм. Не забудьте покормить его!`);
           }
           if (activeCat.cleanliness < 25 && Math.random() < 0.1) {
             addNotification('Грязная шёрстка 🧼', `${activeCat.name} нуждается в теплой ванне!`, 'warning');
+            sendNativeNotification('Грязная шёрстка 🧼', `${activeCat.name} хочет искупаться. Время принять теплую ванну!`);
+          }
+          if (activeCat.happiness < 25 && Math.random() < 0.1) {
+            addNotification('Котик грустит 🧸', `${activeCat.name} хочет поиграть с вами!`, 'warning');
+            sendNativeNotification('Котику скучно! 🧸', `${activeCat.name} соскучился без внимания. Поиграйте с ним!`);
           }
         }
 
@@ -446,11 +605,69 @@ export const useGameState = () => {
   }, [profile, addNotification, checkForNewAchievements]);
 
   // Взаимодействие с активным котиком (Покормить, поиграть, искупать, уложить спать)
-  const interactWithCat = useCallback((action: 'feed' | 'play' | 'clean' | 'sleep' | 'groom') => {
+  const interactWithCat = useCallback((action: 'feed' | 'play' | 'clean' | 'sleep' | 'groom' | string) => {
     if (!profile) return;
+
+    // Определяем, используется ли конкретный расходник
+    const isConsumable = action.startsWith('food_') || action.startsWith('soap_') || action.startsWith('toy_');
+    let itemToUse: typeof CONSUMABLE_ITEMS[0] | undefined;
+    let actualActionType: 'feed' | 'play' | 'clean' | 'sleep' | 'groom' = 'feed';
+    let targetItemId = '';
+
+    if (isConsumable) {
+      itemToUse = CONSUMABLE_ITEMS.find(i => i.id === action);
+      if (!itemToUse) return;
+      targetItemId = itemToUse.id;
+      actualActionType = itemToUse.type === 'food' ? 'feed' : itemToUse.type === 'soap' ? 'clean' : 'play';
+    } else {
+      // Это общее действие. Попробуем найти доступный предмет этого типа в инвентаре
+      actualActionType = action as any;
+      if (actualActionType === 'feed') {
+        const availableFood = ['food_kibble', 'food_treat', 'food_tuna', 'food_steak'].find(id => (profile.inventory?.[id] || 0) > 0);
+        if (!availableFood) {
+          addNotification('Еда закончилась! 🐟', 'У вас нет еды в инвентаре. Купите вкусняшки на Кухне или в Магазине!', 'warning');
+          return;
+        }
+        targetItemId = availableFood;
+        itemToUse = CONSUMABLE_ITEMS.find(i => i.id === targetItemId);
+      } else if (actualActionType === 'clean') {
+        const availableSoap = ['soap_lavender', 'soap_minerals', 'soap_charcoal'].find(id => (profile.inventory?.[id] || 0) > 0);
+        if (!availableSoap) {
+          addNotification('Мыло закончилось! 🧼', 'У вас нет мыла в инвентаре. Купите его в Магазине!', 'warning');
+          return;
+        }
+        targetItemId = availableSoap;
+        itemToUse = CONSUMABLE_ITEMS.find(i => i.id === targetItemId);
+      } else if (actualActionType === 'play') {
+        const availableToy = ['toy_wand', 'toy_laser', 'toy_catnip'].find(id => (profile.inventory?.[id] || 0) > 0);
+        if (!availableToy) {
+          addNotification('Игрушки закончились! 🎾', 'У вас нет игрушек в инвентаре. Купите новую игрушку в Магазине!', 'warning');
+          return;
+        }
+        targetItemId = availableToy;
+        itemToUse = CONSUMABLE_ITEMS.find(i => i.id === targetItemId);
+      }
+    }
+
+    // Проверяем наличие предмета, если используется расходник
+    if (itemToUse) {
+      const qty = profile.inventory?.[targetItemId] || 0;
+      if (qty <= 0) {
+        addNotification('Товар закончился! 🛒', `У вас нет "${itemToUse.name}". Приобретите его в Магазине.`, 'warning');
+        return;
+      }
+    }
 
     setProfile((prev) => {
       if (!prev) return null;
+
+      // Клонируем инвентарь для изменения
+      const updatedInventory = { ...(prev.inventory || {}) };
+      if (itemToUse) {
+        updatedInventory[targetItemId] = Math.max(0, (updatedInventory[targetItemId] || 0) - 1);
+      }
+
+      let isActionAborted = false;
 
       const updatedCats = prev.cats.map((cat) => {
         if (cat.id !== prev.activeCatId) return cat;
@@ -458,39 +675,52 @@ export const useGameState = () => {
         let { hunger, happiness, cleanliness, energy, status, level, xp } = cat;
         let gainedXp = 0;
 
-        if (status === 'sleeping' && action !== 'sleep') {
+        if (status === 'sleeping' && actualActionType !== 'sleep') {
+          isActionAborted = true;
           return cat;
         }
 
-        if (action === 'feed') {
-          if (hunger >= 100) return cat;
-          hunger = Math.min(100, hunger + 25);
-          gainedXp = 15;
-          status = 'eating';
-          addNotification('Вкусная трапеза 🐟', `${cat.name} с аппетитом съел свежего лосося.`, 'success');
-        } else if (action === 'play') {
-          if (energy < 15) {
-            addNotification('Устал 💤', `${cat.name} слишком устал, чтобы играть. Дайте ему поспать.`, 'warning');
+        if (actualActionType === 'feed') {
+          if (hunger >= 100) {
+            isActionAborted = true;
+            addNotification('Котик сыт 💤', `${cat.name} не хочет кушать прямо сейчас.`, 'info');
             return cat;
           }
-          happiness = Math.min(100, happiness + 30);
-          energy = Math.max(0, energy - 15);
-          gainedXp = 20;
+          const boostVal = itemToUse ? itemToUse.boost : 25;
+          hunger = Math.min(100, hunger + boostVal);
+          gainedXp = itemToUse ? itemToUse.xpBoost : 15;
+          status = 'eating';
+          addNotification(`Вкусная трапеза ${itemToUse?.emoji || '🐟'}`, `${cat.name} с аппетитом съел "${itemToUse?.name || 'Лосось'}".`, 'success');
+        } else if (actualActionType === 'play') {
+          if (energy < 15) {
+            isActionAborted = true;
+            addNotification('Устал 💤', `${cat.name} слишком устал, чтобы играть. Отправьте его поспать.`, 'warning');
+            return cat;
+          }
+          const boostVal = itemToUse ? itemToUse.boost : 30;
+          happiness = Math.min(100, happiness + boostVal);
+          energy = Math.max(0, energy - (itemToUse ? (itemToUse.id === 'toy_catnip' ? 5 : itemToUse.id === 'toy_laser' ? 15 : 8) : 15));
+          gainedXp = itemToUse ? itemToUse.xpBoost : 20;
           status = 'playing';
-          addNotification('Игры с ленточкой 🎾', `${cat.name} весело гоняется за клубочком!`, 'success');
-        } else if (action === 'clean') {
-          if (cleanliness >= 100) return cat;
-          cleanliness = Math.min(100, cleanliness + 35);
-          gainedXp = 18;
+          addNotification(`Веселые игры ${itemToUse?.emoji || '🎾'}`, `${cat.name} с радостью играет с "${itemToUse?.name || 'Игрушка'}"!`, 'success');
+        } else if (actualActionType === 'clean') {
+          if (cleanliness >= 100) {
+            isActionAborted = true;
+            addNotification('Чистый котик 🧼', `${cat.name} уже сверкает чистотой.`, 'info');
+            return cat;
+          }
+          const boostVal = itemToUse ? itemToUse.boost : 35;
+          cleanliness = Math.min(100, cleanliness + boostVal);
+          gainedXp = itemToUse ? itemToUse.xpBoost : 18;
           status = 'bathing';
-          addNotification('Чистые лапки 🧼', `${cat.name} принимает теплую пенную ванну!`, 'success');
-        } else if (action === 'groom') {
+          addNotification(`Теплая ванна ${itemToUse?.emoji || '🧼'}`, `${cat.name} купается с использованием "${itemToUse?.name || 'Мыло'}".`, 'success');
+        } else if (actualActionType === 'groom') {
           cleanliness = Math.min(100, cleanliness + 20);
           happiness = Math.min(100, happiness + 20);
           gainedXp = 25;
           status = 'grooming';
-          addNotification('Шелковистая шёрстка ✨', `Вы тщательно вычесали шёрстку ${cat.name}! Получено +15 лапок!`, 'success');
-        } else if (action === 'sleep') {
+          addNotification('Шелковистая шёрстка ✨', `Вы тщательно вычесали шёрстку ${cat.name}! Получено +12 лапок!`, 'success');
+        } else if (actualActionType === 'sleep') {
           if (status === 'sleeping') {
             status = 'idle';
             addNotification('Котик проснулся 🥱', `${cat.name} готов к играм и общению!`, 'info');
@@ -500,7 +730,7 @@ export const useGameState = () => {
           }
         }
 
-        if (action !== 'sleep' && status !== 'sleeping') {
+        if (actualActionType !== 'sleep' && status !== 'sleeping' && !isActionAborted) {
           setTimeout(() => {
             setProfile((p) => {
               if (!p) return null;
@@ -512,34 +742,36 @@ export const useGameState = () => {
           }, 3500);
         }
 
-        xp += gainedXp;
-        const neededXp = level * 100;
-        if (xp >= neededXp) {
-          xp -= neededXp;
-          level += 1;
-          const currentCatName = cat.name;
-          const currentCatId = cat.id;
-          const newLevel = level;
-          setTimeout(() => {
-            addNotification('Новый уровень! 🌟', `${currentCatName} вырос до ${newLevel} уровня! Получено +50 лапок!`, 'success');
-            setProfile((p) => {
-              if (!p) return null;
-              const newDiaryEntry: DiaryEntry = {
-                id: 'diary_' + Math.random().toString(36).substring(2, 11),
-                catId: currentCatId,
-                timestamp: Date.now(),
-                type: 'level_up',
-                title: `${currentCatName} достиг ${newLevel} уровня! 🌟`,
-                description: `Ваш любимец преодолел очередную планку! Теперь он стал взрослее и сильнее. Получено +50 бонусных лапок.`,
-                icon: '🌟'
-              };
-              return { 
-                ...p, 
-                paws: p.paws + 50,
-                diary: [newDiaryEntry, ...(p.diary || [])]
-              };
-            });
-          }, 400);
+        if (!isActionAborted) {
+          xp += gainedXp;
+          const neededXp = level * 100;
+          if (xp >= neededXp) {
+            xp -= neededXp;
+            level += 1;
+            const currentCatName = cat.name;
+            const currentCatId = cat.id;
+            const newLevel = level;
+            setTimeout(() => {
+              addNotification('Новый уровень! 🌟', `${currentCatName} вырос до ${newLevel} уровня! Получено +75 лапок!`, 'success');
+              setProfile((p) => {
+                if (!p) return null;
+                const newDiaryEntry: DiaryEntry = {
+                  id: 'diary_' + Math.random().toString(36).substring(2, 11),
+                  catId: currentCatId,
+                  timestamp: Date.now(),
+                  type: 'level_up',
+                  title: `${currentCatName} достиг ${newLevel} уровня! 🌟`,
+                  description: `Ваш любимец преодолел очередную планку! Теперь он стал взрослее и сильнее. Получено +75 бонусных лапок.`,
+                  icon: '🌟'
+                };
+                return { 
+                  ...p, 
+                  paws: p.paws + 75,
+                  diary: [newDiaryEntry, ...(p.diary || [])]
+                };
+              });
+            }, 400);
+          }
         }
 
         return {
@@ -554,19 +786,27 @@ export const useGameState = () => {
         };
       });
 
-      // Начисление лапок за действия
+      if (isActionAborted) {
+        return prev;
+      }
+
+      // Начисление лапок за действия в зависимости от редкости предмета
       let actionPaws = 0;
-      if (action === 'feed') actionPaws = 5;
-      if (action === 'play') actionPaws = 8;
-      if (action === 'clean') actionPaws = 6;
-      if (action === 'groom') actionPaws = 15;
+      if (itemToUse) {
+        if (itemToUse.rarity === 'common') actionPaws = 2;
+        else if (itemToUse.rarity === 'rare') actionPaws = 4;
+        else if (itemToUse.rarity === 'epic') actionPaws = 7;
+        else if (itemToUse.rarity === 'legendary') actionPaws = 12;
+      } else {
+        if (actualActionType === 'groom') actionPaws = 12; // уменьшено с 15
+      }
 
       const updatedQuests = prev.quests.map((q) => {
         if (q.completed) return q;
         let progress = q.progress;
-        if (q.type === 'feed' && action === 'feed') progress += 1;
-        if (q.type === 'play' && action === 'play') progress += 1;
-        if (q.type === 'clean' && action === 'clean') progress += 1;
+        if (q.type === 'feed' && actualActionType === 'feed') progress += 1;
+        if (q.type === 'play' && actualActionType === 'play') progress += 1;
+        if (q.type === 'clean' && actualActionType === 'clean') progress += 1;
         
         let completed = progress >= q.target;
         if (completed && !q.completed) {
@@ -595,7 +835,7 @@ export const useGameState = () => {
 
       // Обновление аналитики
       setAnalytics((prevAnalytics) => {
-        const key = action === 'feed' ? 'feed' : action === 'play' ? 'play' : action === 'clean' ? 'clean' : 'sleep';
+        const key = actualActionType === 'feed' ? 'feed' : actualActionType === 'play' ? 'play' : actualActionType === 'clean' ? 'clean' : 'sleep';
         const updatedAct = { ...prevAnalytics.actionsPerformed };
         updatedAct[key] += 1;
 
@@ -613,6 +853,7 @@ export const useGameState = () => {
 
       const nextProfile = {
         ...prev,
+        inventory: updatedInventory,
         cats: updatedCats,
         quests: questPawsEarned,
         paws: prev.paws + actionPaws,
@@ -654,7 +895,7 @@ export const useGameState = () => {
           const currentCatId = cat.id;
           const newLevel = level;
           setTimeout(() => {
-            addNotification('Новый уровень! 🌟', `${currentCatName} достиг уровня ${newLevel}! +50 лапок!`, 'success');
+            addNotification('Новый уровень! 🌟', `${currentCatName} достиг уровня ${newLevel}! +75 лапок!`, 'success');
             setProfile((p) => {
               if (!p) return null;
               const newDiaryEntry: DiaryEntry = {
@@ -663,12 +904,12 @@ export const useGameState = () => {
                 timestamp: Date.now(),
                 type: 'level_up',
                 title: `${currentCatName} достиг ${newLevel} уровня! 🌟`,
-                description: `Поздравляем! Поглаживания и ласка помогли вашему котику вырасти до ${newLevel} уровня. Начислено +50 лапок.`,
+                description: `Поздравляем! Поглаживания и ласка помогли вашему котику вырасти до ${newLevel} уровня. Начислено +75 лапок.`,
                 icon: '🌟'
               };
               return { 
                 ...p, 
-                paws: p.paws + 50,
+                paws: p.paws + 75,
                 diary: [newDiaryEntry, ...(p.diary || [])]
               };
             });
@@ -788,11 +1029,47 @@ export const useGameState = () => {
     });
   }, [profile, addNotification, checkForNewAchievements]);
 
-  // Покупка скина или аксессуара
+  // Покупка скина, аксессуара или расходного материала
   const purchaseSkinOrAccessory = useCallback((skinId: string) => {
     if (!profile) return;
 
-    const skinToBuy = INITIAL_SKINS.find((s) => s.id === skinId);
+    // Сначала проверим, не расходник ли это
+    const consumableItem = CONSUMABLE_ITEMS.find((c) => c.id === skinId);
+    if (consumableItem) {
+      if (profile.paws < consumableItem.cost) {
+        addNotification('Мало лапок 🐾', `Вам нужно ${consumableItem.cost} лапок, а у вас ${profile.paws}.`, 'warning');
+        return;
+      }
+
+      setProfile((prev) => {
+        if (!prev) return null;
+
+        setAnalytics((prevAnalytics) => {
+          const updated = {
+            ...prevAnalytics,
+            pawsSpent: prevAnalytics.pawsSpent + consumableItem.cost,
+          };
+          localStorage.setItem('maccat_analytics', JSON.stringify(updated));
+          return updated;
+        });
+
+        addNotification('Покупка успешна! 🛍️', `Куплено "${consumableItem.name}" ${consumableItem.emoji}! Товар добавлен в ваш инвентарь на полку.`, 'success');
+
+        const updatedInventory = { ...(prev.inventory || {}) };
+        updatedInventory[skinId] = (updatedInventory[skinId] || 0) + 1;
+
+        const nextProfile = {
+          ...prev,
+          paws: prev.paws - consumableItem.cost,
+          inventory: updatedInventory,
+        };
+        return checkForNewAchievements(nextProfile);
+      });
+      return;
+    }
+
+    // Иначе это скин или аксессуар
+    const skinToBuy = ALL_SKINS_LIST.find((s) => s.id === skinId);
     if (!skinToBuy) return;
 
     if (profile.paws < skinToBuy.cost) {
@@ -847,7 +1124,7 @@ export const useGameState = () => {
     setProfile((prev) => {
       if (!prev) return null;
 
-      const selectedSkin = INITIAL_SKINS.find((s) => s.id === skinId);
+      const selectedSkin = ALL_SKINS_LIST.find((s) => s.id === skinId);
       if (!selectedSkin) return prev;
 
       const isAccessory = !!selectedSkin.accessory;
@@ -1130,11 +1407,12 @@ export const useGameState = () => {
     return { success: true, message: `Успешно начислено +${awardPaws} лапок!` };
   }, [profile, addNotification, checkForNewAchievements]);
 
-  // Симулированное облачное сохранение Firestore с конфликтами
-  const triggerCloudSync = useCallback(() => {
+  // Настоящее облачное сохранение Firestore с конфликтами
+  const triggerCloudSync = useCallback(async () => {
     if (!profile) return;
     
     if (!isOnline || isOfflineMode) {
+      FirebaseLogger.log('warn', `Синхронизация отклонена: оффлайн-режим (isOfflineMode=${isOfflineMode}, isOnline=${isOnline})`);
       addNotification('Сбой сети 🌐', 'В данный момент вы оффлайн. Прогресс сохранен в локальный кэш и синхронизируется при появлении связи.', 'warning');
       const timeStr = new Date().toLocaleTimeString();
       setSyncLog(prev => [`[${timeStr}] ⚠️ Изменения сохранены в локальный оффлайн-буфер.`, ...prev]);
@@ -1142,51 +1420,83 @@ export const useGameState = () => {
     }
 
     setSyncing(true);
+    FirebaseLogger.log('info', `Начало синхронизации профиля ${profile.nickname} с Firestore...`);
     addNotification('Сохранение...', 'Подключение к Firebase Firestore...', 'info');
     const timeStr = new Date().toLocaleTimeString();
     setSyncLog(prev => [`[${timeStr}] 📡 Попытка подключения к Firestore...`, ...prev]);
 
-    setTimeout(() => {
-      const cloudDbStr = localStorage.getItem('maccat_cloud_db');
-      if (cloudDbStr) {
-        try {
-          const cloudProfile: PlayerProfile = JSON.parse(cloudDbStr);
-          
-          // Проверяем наличие конфликта (прогресс в облаке превосходит локальный в чем-то)
-          const isConflict = 
-            cloudProfile.paws !== profile.paws || 
-            cloudProfile.cats.length !== profile.cats.length ||
-            cloudProfile.cats.some(cc => {
-              const lc = profile.cats.find(cat => cat.id === cc.id);
-              return !lc || lc.level !== cc.level || lc.xp !== cc.xp;
-            }) ||
-            cloudProfile.unlockedSkins.length !== profile.unlockedSkins.length;
+    try {
+      const userRef = doc(db, 'users', profile.nickname);
+      const docSnap = await getDoc(userRef);
 
-          if (isConflict) {
-            setSyncing(false);
-            const timeConflict = new Date().toLocaleTimeString();
-            setSyncLog(prev => [`[${timeConflict}] ⚠️ Обнаружена рассинхронизация с сервером Firebase (другое устройство)!`, ...prev]);
-            
-            // Запускаем окно выбора
-            setConflictCloudData(cloudProfile);
-            setConflictLocalData(profile);
-            setShowConflictModal(true);
-            addNotification('Конфликт данных! ⚠️', 'Обнаружены разные сейвы в Firebase и на этом телефоне. Выберите действие.', 'warning');
-            return;
-          }
-        } catch (e) {
-          console.error(e);
+      if (docSnap.exists()) {
+        const cloudProfile = docSnap.data() as PlayerProfile;
+        FirebaseLogger.log('info', `Профиль обнаружен на сервере Firestore. Сравнение параметров...`);
+        
+        // Настоящий конфликт возникает ТОЛЬКО если прогресс в облаке по ключевым параметрам строго превосходит локальный,
+        // или если списки скинов расходятся так, что в облаке есть то, чего нет локально.
+        const isConflict = 
+          (cloudProfile.paws > profile.paws) || 
+          (cloudProfile.cats.length > profile.cats.length) ||
+          cloudProfile.cats.some(cc => {
+            const lc = profile.cats.find(cat => cat.id === cc.id);
+            if (!lc) return true; // в облаке есть котик, которого нет локально
+            if (cc.level > lc.level) return true; // в облаке котик более высокого уровня
+            if (cc.level === lc.level && cc.xp > lc.xp) return true; // в облаке больше XP при том же уровне
+            return false;
+          }) ||
+          (cloudProfile.unlockedSkins && cloudProfile.unlockedSkins.some(s => !profile.unlockedSkins.includes(s)));
+
+        if (isConflict) {
+          FirebaseLogger.log('warn', `Обнаружен конфликт версий! Облачные paws=${cloudProfile.paws}, локальные paws=${profile.paws}.`);
+          setSyncing(false);
+          const timeConflict = new Date().toLocaleTimeString();
+          setSyncLog(prev => [`[${timeConflict}] ⚠️ Обнаружена рассинхронизация с сервером Firebase (другое устройство)!`, ...prev]);
+          
+          // Запускаем окно выбора
+          setConflictCloudData(cloudProfile);
+          setConflictLocalData(profile);
+          setShowConflictModal(true);
+          addNotification('Конфликт данных! ⚠️', 'Обнаружены разные сейвы в Firebase и на этом телефоне. Выберите действие.', 'warning');
+          return;
         }
       }
 
       // Если конфликтов нет - пишем в облако
-      localStorage.setItem('maccat_cloud_db', JSON.stringify(profile));
+      FirebaseLogger.log('info', `Конфликтов не обнаружено. Запись данных в Firestore...`);
+      const now = Date.now();
+      const updatedProfile = { 
+        ...profile, 
+        lastSavedTime: now 
+      };
+
+      const cleanedProfile = { ...updatedProfile };
+      // Удаляем undefined значения перед записью в Firestore чтобы не падало
+      Object.keys(cleanedProfile).forEach(key => {
+        if ((cleanedProfile as any)[key] === undefined) {
+          delete (cleanedProfile as any)[key];
+        }
+      });
+
+      await setDoc(userRef, cleanedProfile, { merge: true });
+      FirebaseLogger.log('success', `Данные успешно записаны в Firestore для ${profile.nickname}!`);
+      
+      // Обновляем локальное состояние с новым lastSavedTime, чтобы оффлайн-упадок считался от этого момента
+      setProfile(updatedProfile);
+      
       setSyncing(false);
       const timeOk = new Date().toLocaleTimeString();
       setLastSyncedTime(timeOk);
-      setSyncLog(prev => [`[${timeOk}] ✅ Данные успешно записаны в облако. Базы идентичны.`, ...prev]);
+      setSyncLog(prev => [`[${timeOk}] ✅ Данные успешно записаны в облако Firestore. Базы идентичны.`, ...prev]);
       addNotification('Сохранено в iCloud! ☁️', 'Ваш прогресс в облаке успешно обновлен.', 'success');
-    }, 1500);
+    } catch (err: any) {
+      FirebaseLogger.log('error', `Ошибка при синхронизации с Firestore: ${err?.message || err}`);
+      console.error('Ошибка при синхронизации с Firestore:', err);
+      setSyncing(false);
+      const timeErr = new Date().toLocaleTimeString();
+      setSyncLog(prev => [`[${timeErr}] ❌ Ошибка соединения: ${err?.message || err}`, ...prev]);
+      addNotification('Ошибка синхронизации ⚠️', 'Не удалось связаться с облаком Firebase.', 'error');
+    }
   }, [profile, isOnline, isOfflineMode, addNotification]);
 
   // Симуляция конфликта (вызывается из интерфейса для демонстрации)
@@ -1236,6 +1546,63 @@ export const useGameState = () => {
     setLastSyncedTime(timeStr);
     setSyncLog(prev => [`[${timeStr}] ✅ Конфликт успешно разрешен методом: [${resolution === 'merge' ? 'Умное Слияние' : resolution === 'keep_cloud' ? 'Приоритет Облака' : 'Приоритет Устройства'}].`, ...prev]);
   }, [conflictLocalData, conflictCloudData, smartMergeProfiles, addNotification]);
+
+  // Претендовать на награду за серию дней заботы
+  const claimStreakMilestone = useCallback((milestoneId: string) => {
+    if (!profile) return;
+    
+    setProfile((prev) => {
+      if (!prev) return null;
+      
+      const claimed = prev.claimedStreakMilestones || [];
+      if (claimed.includes(milestoneId)) return prev;
+      
+      let rewardText = '';
+      let updatedPaws = prev.paws;
+      const updatedSkins = [...prev.unlockedSkins];
+      
+      if (milestoneId === '3') {
+        updatedPaws += 50;
+        rewardText = 'Получено +50 лапок 🐾!';
+      } else if (milestoneId === '7') {
+        updatedPaws += 150;
+        rewardText = 'Получено +150 лапок 🐾!';
+      } else if (milestoneId === '15') {
+        if (!updatedSkins.includes('bengal_leopard')) {
+          updatedSkins.push('bengal_leopard');
+        }
+        rewardText = 'Разблокирована эксклюзивная порода Дикий Бенгал 🐆!';
+      } else if (milestoneId === '30') {
+        if (!updatedSkins.includes('gold_crown')) {
+          updatedSkins.push('gold_crown');
+        }
+        rewardText = 'Получена Золотая Императорская Корона 👑!';
+      }
+      
+      addNotification('Награда за серию дней! 🔥', rewardText, 'success');
+      
+      const newEntry: DiaryEntry = {
+        id: 'diary_' + Math.random().toString(36).substring(2, 11),
+        catId: prev.activeCatId,
+        timestamp: Date.now(),
+        type: 'achievement',
+        title: `Награда за ${milestoneId} дней заботы! 🔥`,
+        description: `Вы проявили настоящую заботу и получили заслуженную награду: ${rewardText}`,
+        icon: '🔥'
+      };
+
+      const next = {
+        ...prev,
+        paws: updatedPaws,
+        unlockedSkins: updatedSkins,
+        claimedStreakMilestones: [...claimed, milestoneId],
+        diary: [newEntry, ...(prev.diary || [])]
+      };
+
+      localStorage.setItem('maccat_profile', JSON.stringify(next));
+      return next;
+    });
+  }, [profile, addNotification]);
 
   // Обновить никнейм
   const updateNickname = useCallback((name: string) => {
@@ -1321,6 +1688,7 @@ export const useGameState = () => {
     selectActiveCat,
     addPaws,
     claimReviewReward,
+    claimStreakMilestone,
     updateWallpaper,
     petCatClick,
     burstPopIt,

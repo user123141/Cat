@@ -41,6 +41,7 @@ export interface DailyQuest {
   completed: boolean;
   claimed: boolean;
   rewardPaws: number;
+  type: 'feed' | 'play' | 'clean' | 'earn_paws' | 'custom' | 'click' | 'antistress';
 }
 
 export interface NotificationItem {
@@ -82,6 +83,7 @@ export interface PlayerProfile {
   cats: Cat[];
   activeCatId: string;
   unlockedSkins: string[]; // массив id скинов
+  unlockedBreeds?: string[]; // массив разблокированных пород
   quests: DailyQuest[];
   unlockedAchievements?: string[];
   totalPlayTime: number;
@@ -97,7 +99,30 @@ export interface PlayerProfile {
   claimedReviewReward: boolean;
   isAdmin?: boolean;
   blocked?: boolean;
+  claimedStreakMilestones?: string[]; // Награды за серии дней
+  careCalendarHistory?: string[]; // Даты входов для календаря
+  lastActiveDay?: string; // Последний активный день
+  createdAt?: string; // Дата регистрации
+  avatar?: string; // Аватар игрока
+  redeemedPromos?: string[]; // Погашенные промокоды
+  lastPromoRedeemedTime?: number; // Время последнего промокода
   // Новые поля для инвентаря
   foodCount: number;
   soapCount: number;
+  fishCount?: number;
+  energyCount?: number;
+  lastSavedTime?: number;
+  inventory?: Record<string, number>;
+}
+
+export interface ConsumableItem {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  cost: number;
+  type: 'food' | 'soap' | 'toy';
+  boost: number;
+  xpBoost: number;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }

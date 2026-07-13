@@ -211,6 +211,36 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
 
         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Sparkles size={14} className="text-amber-400" />
+            Важные PUSH-Уведомления (iOS/PWA)
+          </h3>
+          <p className="text-[10px] text-slate-400 leading-normal text-left">
+            Получайте системные напоминания на телефон или рабочий стол, когда ваш пушистый питомец проголодается или захочет поиграть!
+          </p>
+          <button
+            onClick={async () => {
+              if (!('Notification' in window)) {
+                alert('Ваш браузер или устройство не поддерживает PUSH-уведомления.');
+                return;
+              }
+              const perm = await Notification.requestPermission();
+              if (perm === 'granted') {
+                new Notification('MacCat Care 🐾', {
+                  body: 'Уведомления включены! Теперь мы сообщим вам, когда котику потребуется забота.',
+                  tag: 'maccat_test',
+                });
+              } else {
+                alert('Разрешение на уведомления отклонено. Пожалуйста, включите их в настройках браузера/устройства.');
+              }
+            }}
+            className="w-full py-2 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white transition-all active:scale-95 cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+          >
+            🔔 Разрешить и протестировать Push-уведомления
+          </button>
+        </div>
+
+        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
+          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles size={14} className="text-sky-400" />
             Обои Рабочего Стола macOS
           </h3>

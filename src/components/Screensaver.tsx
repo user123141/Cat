@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Cat } from '../types';
 import { CatRenderer } from './CatRenderer';
-import { getSkinById } from '../hooks/useGameState'; // если есть, или передадим цвета через пропсы
 
 interface ScreensaverProps {
   onDismiss: () => void;

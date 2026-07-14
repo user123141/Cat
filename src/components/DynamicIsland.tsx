@@ -1,3 +1,4 @@
+// src/components/DynamicIsland.tsx
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, CheckCircle, Sparkles, Star, Bell } from 'lucide-react';
@@ -18,6 +19,13 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
     const now = new Date();
     return now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   });
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -55,45 +63,48 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
     }
   };
 
+  const expandedWidth = isMobile ? 'min(90vw, 340px)' : '380px';
+  const collapsedWidth = isMobile ? 'min(30vw, 120px)' : '150px';
+
   return (
-    <div className="relative flex justify-center pointer-events-none select-none z-50">
+    <div className="relative flex justify-center pointer-events-none select-none z-50 w-full px-2">
       <AnimatePresence mode="wait">
         {activeNotification ? (
           <motion.div
             key={activeNotification.id}
-            initial={{ scale: 0.9, y: 4, opacity: 0 }}
+            initial={{ scale: 0.9, y: 10, opacity: 0 }}
             animate={{
               scale: 1,
-              y: 14,
+              y: isMobile ? 24 : 14,
               opacity: 1,
-              width: isExpanded ? '380px' : '150px',
-              height: isExpanded ? 'auto' : '26px',
+              width: isExpanded ? expandedWidth : collapsedWidth,
+              height: isExpanded ? 'auto' : '28px',
               borderRadius: isExpanded ? '24px' : '999px',
             }}
-            exit={{ scale: 0.9, y: 4, opacity: 0 }}
+            exit={{ scale: 0.9, y: 10, opacity: 0 }}
             transition={{
               type: 'spring',
               stiffness: 280,
               damping: 22,
             }}
-            className="pointer-events-auto bg-black text-white shadow-2xl overflow-hidden px-4 py-3 flex items-start gap-3 border border-neutral-800 mt-1"
-            style={{ originX: 0.5, originY: 0 }}
+            className="pointer-events-auto bg-black text-white shadow-2xl overflow-hidden px-4 py-3 flex items-start gap-3 border border-neutral-800"
+            style={{ originX: 0.5, originY: 0, maxWidth: '100%' }}
           >
             {isExpanded ? (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className="flex items-start gap-3 w-full"
+                className="flex items-start gap-3 w-full min-w-0"
               >
                 <div className="p-2 rounded-full bg-neutral-900 border border-neutral-800 flex-shrink-0 mt-0.5">
                   {getIcon(activeNotification.type)}
                 </div>
-                <div className="flex-grow min-w-0 pr-4">
-                  <h4 className="text-xs font-semibold text-neutral-100 tracking-wide leading-tight">
+                <div className="flex-grow min-w-0 pr-1">
+                  <h4 className="text-xs font-semibold text-neutral-100 tracking-wide leading-tight break-words">
                     {activeNotification.title}
                   </h4>
-                  <p className="text-[11px] text-neutral-400 mt-1 leading-snug">
+                  <p className="text-[11px] text-neutral-400 mt-1 leading-snug break-words">
                     {activeNotification.message}
                   </p>
                 </div>
@@ -114,7 +125,7 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
           <motion.div
             initial={{ width: '115px', height: '28px', borderRadius: '999px', opacity: 0.8 }}
             animate={{ width: '115px', height: '28px', borderRadius: '999px', opacity: 1 }}
-            className="pointer-events-auto bg-black text-white shadow-2xl flex items-center justify-center gap-2 border border-white/10 px-3 py-1 font-sans text-xs font-bold tracking-tight mt-1 hover:scale-102 transition-transform"
+            className="pointer-events-auto bg-black text-white shadow-2xl flex items-center justify-center gap-2 border border-white/10 px-3 py-1 font-sans text-xs font-bold tracking-tight hover:scale-102 transition-transform"
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             <span className="text-white/25 font-light">|</span>

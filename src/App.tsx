@@ -1,6 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useGameState } from './hooks/useGameState';
 import { FirebaseLogger } from './utils/FirebaseLogger';
 import { MenuBar } from './components/MenuBar';
@@ -27,7 +27,7 @@ import { db } from './firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { PlayerProfile, Skin } from './types';
 
-const ADMIN_PASSWORD = '1111'; // В реальном проекте должно быть в .env
+const ADMIN_PASSWORD = '1111';
 
 export default function App() {
   const {
@@ -45,7 +45,7 @@ export default function App() {
     setShowConflictModal,
     conflictCloudData,
     conflictLocalData,
-    resolveConflict, // теперь это определено
+    resolveConflict,
     redeemPromoCode,
     createProfile,
     interactWithCat,
@@ -132,7 +132,6 @@ export default function App() {
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Аутентификация при старте
   useEffect(() => {
     initAuth().then((uid) => {
       if (uid) {
@@ -141,9 +140,17 @@ export default function App() {
         FirebaseLogger.log('warn', 'App: аутентификация не удалась, продолжаем в офлайн-режиме');
       }
     });
+
+    // Запрос разрешения на уведомления при первом запуске
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') {
+          console.log('🔔 Уведомления разрешены');
+        }
+      });
+    }
   }, []);
 
-  // Загрузка пользователей для админки
   const fetchUsersList = useCallback(async () => {
     try {
       const snapshot = await getDocs(collection(db, 'users'));
@@ -153,7 +160,6 @@ export default function App() {
     }
   }, []);
 
-  // Автосинхронизация каждые 2 минуты
   useEffect(() => {
     if (!profile) return;
     syncIntervalRef.current = setInterval(() => {
@@ -166,7 +172,6 @@ export default function App() {
     };
   }, [profile, isOnline, isOfflineMode, showConflictModal, originalTriggerCloudSync]);
 
-  // Тема оформления
   useEffect(() => {
     if (!profile) return;
     const updateTheme = () => {
@@ -197,14 +202,12 @@ export default function App() {
     }
   }, [resolvedTheme]);
 
-  // Звуки
   useEffect(() => {
     if (profile) {
       setSoundsMuted(!profile.soundEnabled);
     }
   }, [profile?.soundEnabled]);
 
-  // Скринсейвер
   useEffect(() => {
     let inactivityTimer: NodeJS.Timeout;
     const resetTimer = () => {
@@ -221,7 +224,6 @@ export default function App() {
     };
   }, [showScreensaver]);
 
-  // Админ-функции
   const handleAdminLogin = () => {
     setShowAdminPrompt(true);
   };
@@ -243,7 +245,6 @@ export default function App() {
     setUsersList([]);
   };
 
-  // Обработчики контекстного меню и жестов
   const handleContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const isInsideWindow = target.closest('.mac-window-frame') || target.closest('.glass-panel-dark') || target.closest('button') || target.closest('input');
@@ -273,18 +274,6 @@ export default function App() {
 
   const activeCat = profile?.cats?.find(c => c.id === profile.activeCatId);
 
-  // Получение цветов скина
-  const getSkinColors = useCallback((skinId: string) => {
-    const skin = allSkins.find(s => s.id === skinId);
-    if (skin) {
-      return { color: skin.color, patternColor: skin.patternColor, eyeColor: skin.eyeColor };
-    }
-    return { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
-  }, [allSkins]);
-
-  const activeSkinColors = activeCat ? getSkinColors(activeCat.skinId) : null;
-
-  // Обработчик ручной синхронизации (из меню или настроек)
   const handleManualSync = useCallback(async () => {
     FirebaseLogger.log('info', 'Ручная синхронизация запущена из меню настроек App.tsx');
     await originalTriggerCloudSync();
@@ -293,7 +282,6 @@ export default function App() {
     }
   }, [originalTriggerCloudSync, isAdminMode, fetchUsersList]);
 
-  // Обработчик закрытия окна (для beforeunload)
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (profile) {
@@ -356,7 +344,7 @@ export default function App() {
         }}
         onStreakClick={() => {
           triggerHaptic();
-          setShowAdminDashboard(true);
+          handleOpenWindow('calendar');
         }}
         isAdminMode={isAdminMode}
       >
@@ -366,6 +354,7 @@ export default function App() {
       <SwiftUIWidgets
         profile={profile}
         activeCat={activeCat}
+        allSkins={allSkins}
         onInteract={handleInteractionClick}
         onOpenWindow={(id) => handleOpenWindow(id as WindowId)}
       />
@@ -378,11 +367,12 @@ export default function App() {
                 key="cats"
                 profile={profile}
                 activeCat={activeCat}
+                allSkins={allSkins}
                 onInteract={handleInteractionClick}
                 onSelectCat={selectActiveCat}
                 onClose={() => closeWindow('cats')}
                 onMinimize={() => minimizeWindow('cats')}
-                onAdoptClick={() => handleOpenWindow('cats')} // пока нет отдельного окна, оставляем
+                onAdoptClick={() => handleOpenWindow('cats')}
                 onPetClick={petCatClick}
               />
             )}
@@ -435,13 +425,9 @@ export default function App() {
                 onSync={handleManualSync}
                 onUpdateNickname={updateNickname}
                 onUpdateTheme={updateThemePref}
-                onUpdateWallpaper={updateWallpaper}
                 onClaimReviewReward={claimReviewReward}
                 isOfflineMode={isOfflineMode}
                 setIsOfflineMode={setIsOfflineMode}
-                syncLog={syncLog}
-                lastSyncedTime={lastSyncedTime}
-                onRedeemPromo={redeemPromoCode}
                 onClose={() => closeWindow('settings')}
                 onMinimize={() => minimizeWindow('settings')}
               />
@@ -459,8 +445,6 @@ export default function App() {
                 onAddDiaryEntry={addDiaryEntry}
               />
             )}
-
-
           </AnimatePresence>
         </div>
       </div>
@@ -560,11 +544,22 @@ export default function App() {
         </div>
       )}
 
-      <Dock
-        activeWindow={activeWindow}
-        minimizedWindows={minimizedWindows}
-        onOpenWindow={(id) => handleToggleWindow(id as WindowId)}
-      />
+      <AnimatePresence>
+        {openWindows.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Dock
+              activeWindow={activeWindow}
+              minimizedWindows={minimizedWindows}
+              onOpenWindow={(id) => handleToggleWindow(id as WindowId)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <CarePackPopover
         isOpen={careCategory !== null}
@@ -582,7 +577,7 @@ export default function App() {
           <Screensaver
             onDismiss={() => setShowScreensaver(false)}
             activeCat={activeCat}
-            activeSkin={activeSkinColors || undefined}
+            allSkins={allSkins}
           />
         )}
       </AnimatePresence>

@@ -1,18 +1,19 @@
+// src/components/Screensaver.tsx
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Cat } from '../types';
+import { Cat, Skin } from '../types';
 import { NeedsCatRenderer } from './NeedsCatRenderer';
 
 interface ScreensaverProps {
   onDismiss: () => void;
-  activeCat?: Cat; // активный кот
-  activeSkin?: { color: string; patternColor: string; eyeColor: string }; // цвета скина
+  activeCat?: Cat;
+  allSkins?: Skin[];
 }
 
 export const Screensaver: React.FC<ScreensaverProps> = ({ 
   onDismiss, 
   activeCat,
-  activeSkin 
+  allSkins = [],
 }) => {
   const [time, setTime] = useState(new Date());
 
@@ -57,8 +58,24 @@ export const Screensaver: React.FC<ScreensaverProps> = ({
     });
   };
 
-  // Если нет активного кота, показываем заглушку
-  const catToShow = activeCat || null;
+  const getSkinColors = () => {
+    if (!activeCat) return { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
+    const skin = allSkins.find(s => s.id === activeCat.skinId);
+    if (skin) {
+      return { color: skin.color, patternColor: skin.patternColor, eyeColor: skin.eyeColor };
+    }
+    if (activeCat.breed === 'Siamese') return { color: '#fef3c7', patternColor: '#78350f', eyeColor: '#06b6d4' };
+    if (activeCat.breed === 'British Shorthair') return { color: '#64748b', patternColor: '#475569', eyeColor: '#f59e0b' };
+    if (activeCat.breed === 'Sphynx') return { color: '#fda4af', patternColor: '#f43f5e', eyeColor: '#10b981' };
+    if (activeCat.breed === 'Persian') return { color: '#fef08a', patternColor: '#eab308', eyeColor: '#a855f7' };
+    if (activeCat.breed === 'Bombay') return { color: '#1e293b', patternColor: '#0f172a', eyeColor: '#f59e0b' };
+    if (activeCat.breed === 'Bengal') return { color: '#f59e0b', patternColor: '#78350f', eyeColor: '#10b981' };
+    if (activeCat.breed === 'Sakura Neko') return { color: '#fff1f2', patternColor: '#fda4af', eyeColor: '#ec4899' };
+    if (activeCat.breed === 'Galaxy Cat') return { color: '#312e81', patternColor: '#6366f1', eyeColor: '#a855f7' };
+    return { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
+  };
+
+  const skinColors = getSkinColors();
 
   return (
     <motion.div
@@ -73,7 +90,6 @@ export const Screensaver: React.FC<ScreensaverProps> = ({
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full bg-rose-500/5 blur-3xl" />
 
       <div className="flex flex-col items-center gap-10 my-auto">
-        {/* Часы */}
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -88,25 +104,28 @@ export const Screensaver: React.FC<ScreensaverProps> = ({
           </span>
         </motion.div>
 
-        {/* Кот (активный) */}
-        {catToShow && activeSkin ? (
+        {activeCat && (
           <div className="bg-neutral-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-sm shadow-xl">
             <NeedsCatRenderer
-              status={catToShow.status}
-              hunger={catToShow.hunger}
-              happiness={catToShow.happiness}
-              cleanliness={catToShow.cleanliness}
-              energy={catToShow.energy}
-              breed={catToShow.breed}
-              color={activeSkin.color}
-              patternColor={activeSkin.patternColor}
-              eyeColor={activeSkin.eyeColor}
-              accessory={(catToShow as any).accessory}
+              status={activeCat.status}
+              hunger={activeCat.hunger}
+              happiness={activeCat.happiness}
+              cleanliness={activeCat.cleanliness}
+              energy={activeCat.energy}
+              breed={activeCat.breed}
+              color={skinColors.color}
+              patternColor={skinColors.patternColor}
+              eyeColor={skinColors.eyeColor}
+              hat={activeCat.hat}
+              glasses={activeCat.glasses}
+              collar={activeCat.collar}
+              scarf={activeCat.scarf}
+              boots={activeCat.boots}
+              wings={activeCat.wings}
+              accessory={activeCat.accessory}
               size={140}
             />
           </div>
-        ) : (
-          <div className="text-neutral-500 text-sm">Кот не выбран</div>
         )}
       </div>
 

@@ -1,7 +1,7 @@
 // src/components/QuestsWindow.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DailyQuest, PlayerProfile, Cat } from '../types';
-import { Target, CheckCircle2, Award, Gift, Flame, Sparkles, Calendar, Check, Lock, ChevronRight } from 'lucide-react';
+import { Target, CheckCircle2, Award, Gift, Flame, Sparkles, Calendar, Check, Lock } from 'lucide-react';
 import { triggerHapticLight, triggerHapticMedium } from '../utils/audio';
 import { MacCatWindowFrame } from './MacCatWindowFrame';
 
@@ -27,6 +27,28 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
   initialTab = 'quests',
 }) => {
   const [activeTab, setActiveTab] = useState<'quests' | 'calendar'>(initialTab);
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      const diff = tomorrow.getTime() - now.getTime();
+      if (diff <= 0) {
+        setTimeLeft('Обновление скоро');
+        return;
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!profile) return null;
 
@@ -37,10 +59,8 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
   const claimedMilestones = profile.claimedStreakMilestones || [];
   const calendarHistory = profile.careCalendarHistory || [];
 
-  // 30 days grid data for visual representation
   const daysInGrid = Array.from({ length: 30 }, (_, i) => i + 1);
 
-  // Milestones specification
   const milestones = [
     { id: '3', days: 3, reward: '+50 Лапок 🐾', desc: 'Начальный бонус за заботу', icon: '🐾' },
     { id: '7', days: 7, reward: '+150 Лапок 🐾', desc: 'Серебряный бонус за заботу', icon: '✨' },
@@ -62,20 +82,19 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
       title="Задачи и Забота"
       subtitle={activeTab === 'quests' ? 'Квесты дня' : 'Календарь серии'}
       headerRight={
-        activeTab === 'quests' ? (
-          <div className="flex items-center gap-1 bg-rose-500/15 border border-rose-400/20 px-2 py-0.5 rounded-full text-[10px] font-bold text-rose-400 shrink-0">
-            <Target size={10} className="animate-pulse" />
-            <span className="font-mono">{completedCount} / {profile.quests.length}</span>
+        <div className="flex items-center gap-2">
+          {activeTab === 'quests' && (
+            <div className="flex items-center gap-1 bg-rose-500/15 border border-rose-400/20 px-2 py-0.5 rounded-full text-[10px] font-bold text-rose-400 shrink-0">
+              <Target size={10} className="animate-pulse" />
+              <span className="font-mono">{completedCount} / {profile.quests.length}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1 bg-sky-500/10 border border-sky-400/20 px-2 py-0.5 rounded-full text-[10px] font-bold text-sky-400 shrink-0">
+            <span>⏱️ {timeLeft}</span>
           </div>
-        ) : (
-          <div className="flex items-center gap-1 bg-orange-500/15 border border-orange-400/20 px-2 py-0.5 rounded-full text-[10px] font-bold text-orange-400 shrink-0">
-            <Flame size={10} className="animate-bounce" />
-            <span className="font-mono">{currentStreak} дней</span>
-          </div>
-        )
+        </div>
       }
     >
-      {/* 1. iOS-style Tab Switcher */}
       <div className="flex px-3 pt-2.5 pb-2.5 justify-center bg-black/10 border-b border-white/5 shrink-0">
         <div className="flex w-full max-w-md p-0.5 bg-black/30 rounded-xl border border-white/5">
           <button
@@ -103,11 +122,9 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
         </div>
       </div>
 
-      {/* 2. Content */}
       <div className="flex-1 overflow-y-auto p-4 bg-slate-900/40 space-y-4">
         {activeTab === 'quests' ? (
           <>
-            {/* Visual Progress Banner */}
             <div className="rounded-2xl bg-gradient-to-r from-rose-500/10 to-indigo-500/10 border border-white/5 p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="space-y-0.5">
                 <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -148,7 +165,6 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
               </div>
             </div>
 
-            {/* Quests list */}
             <div className="space-y-2">
               {profile.quests.map((q) => {
                 const isCompleted = q.completed;
@@ -165,7 +181,6 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
                         : 'bg-white/5 border-white/5 hover:border-white/10'
                     }`}
                   >
-                    {/* Left Side Info */}
                     <div className="flex items-start gap-2.5 flex-1 min-w-0">
                       <div className={`p-1.5 rounded-lg border flex-shrink-0 mt-0.5 ${
                         isClaimed
@@ -186,7 +201,6 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
                           {q.text}
                         </h4>
                         
-                        {/* Progress bar */}
                         <div className="flex items-center gap-2">
                           <div className="w-20 h-1 bg-black/40 rounded-full overflow-hidden border border-white/5">
                             <div 
@@ -203,7 +217,6 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
                       </div>
                     </div>
 
-                    {/* Right Side Reward Controls */}
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                       <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-[8px] font-bold font-mono text-amber-400">
                         <Gift size={8} />
@@ -237,7 +250,6 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
           </>
         ) : (
           <>
-            {/* Calendar Hero Banner */}
             <div className="bg-gradient-to-r from-orange-500/10 via-pink-500/5 to-indigo-500/10 border border-orange-500/15 rounded-2xl p-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-orange-400 to-amber-500 flex items-center justify-center text-white shrink-0">
@@ -260,9 +272,7 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
               </div>
             </div>
 
-            {/* Grid & Milestones */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-              {/* Journal Grid */}
               <div className="md:col-span-7 bg-white/5 border border-white/5 rounded-2xl p-3.5 space-y-3 text-left">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[10px] font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1">
@@ -302,7 +312,6 @@ export const QuestsWindow: React.FC<QuestsWindowProps> = ({
                 </div>
               </div>
 
-              {/* Milestones list */}
               <div className="md:col-span-5 bg-white/5 border border-white/5 rounded-2xl p-3.5 space-y-3 text-left">
                 <h4 className="text-[10px] font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1">
                   <Award size={11} className="text-orange-400" />

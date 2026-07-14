@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PlayerProfile } from '../types';
+import { RefreshCw, Flame } from 'lucide-react';
 
 interface MenuBarProps {
   profile: PlayerProfile | null;
@@ -28,6 +29,13 @@ export const MenuBar: React.FC<MenuBarProps> = ({
 }) => {
   const [showStatusIndicator, setShowStatusIndicator] = useState(false);
   const [prevOnline, setPrevOnline] = useState(isOnline);
+  const [streak, setStreak] = useState(profile?.streak || 1);
+
+  useEffect(() => {
+    if (profile) {
+      setStreak(profile.streak || 1);
+    }
+  }, [profile]);
 
   useEffect(() => {
     if (isOnline !== prevOnline) {
@@ -46,20 +54,37 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       {/* Левая часть */}
       <div className="flex items-center gap-1.5 flex-1 min-w-0 shrink-0">
         <span className="text-sm cursor-pointer hover:opacity-75 active:scale-95 transition-all text-slate-900 dark:text-white px-0.5" onClick={onOpenAbout}></span>
-        <span className="font-semibold tracking-tight text-slate-950 dark:text-white text-[10px]">MacCat</span>
-        <span className="hidden xs:inline px-1 py-0 rounded-md bg-white/40 dark:bg-black/30 border border-white/30 dark:border-white/5 text-[7px] font-mono tracking-wider opacity-80">v1.5</span>
+        
+        <button
+          onClick={onSync}
+          disabled={syncing}
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all active:scale-95 disabled:opacity-50"
+          title={syncing ? 'Синхронизация...' : 'Синхронизировать с облаком'}
+        >
+          <RefreshCw size={12} className={`${syncing ? 'animate-spin' : ''} text-slate-600 dark:text-slate-300`} />
+          <span className="text-[8px] font-mono font-bold text-slate-600 dark:text-slate-300 hidden sm:inline">
+            {syncing ? 'Синхр...' : 'Синхр.'}
+          </span>
+        </button>
+
+        <button
+          onClick={onStreakClick}
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all active:scale-95"
+        >
+          <Flame size={12} className="text-rose-500 animate-pulse" />
+          <span className="text-[9px] font-black text-rose-500 font-mono">{streak}</span>
+        </button>
       </div>
 
-      {/* Dynamic Island */}
+      {/* Центр: Dynamic Island */}
       {children && (
-        <div className="flex-none flex justify-center items-center pointer-events-auto scale-90">
+        <div className="flex-none flex justify-center items-center pointer-events-auto">
           {children}
         </div>
       )}
 
-      {/* Правая часть */}
+      {/* Правая часть: статус сети */}
       <div className="flex items-center gap-1.5 relative flex-1 justify-end min-w-0 shrink-0 overflow-visible">
-        
         <AnimatePresence>
           {(!isOnline || (isOnline && showStatusIndicator)) && (
             <motion.div
@@ -83,7 +108,6 @@ export const MenuBar: React.FC<MenuBarProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-
       </div>
     </div>
   );

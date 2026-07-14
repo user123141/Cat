@@ -1,7 +1,7 @@
 // src/components/Dock.tsx
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat, Calendar } from 'lucide-react';
+import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat } from 'lucide-react';
 
 interface DockProps {
   activeWindow: string | null;
@@ -12,7 +12,6 @@ interface DockProps {
 export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOpenWindow }) => {
   const dockItems = [
     { id: 'cats', label: 'Котята', icon: <Cat size={26} className="text-slate-700 dark:text-slate-300" /> },
-    { id: 'calendar', label: 'Календарь', icon: <Calendar size={26} className="text-orange-500 animate-pulse" /> },
     { id: 'antistress', label: 'Антистресс', icon: <Sparkles size={26} className="text-amber-500" /> },
     { id: 'shop', label: 'Магазин', icon: <ShoppingBag size={26} className="text-purple-600 dark:text-purple-400" /> },
     { id: 'quests', label: 'Задания', icon: <Target size={26} className="text-rose-500" /> },
@@ -34,7 +33,6 @@ export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOp
 
           return (
             <div key={item.id} className="relative group flex flex-col items-center">
-              {/* Всплывающая подсказка – только на десктопе */}
               <div className="hidden sm:block absolute -top-10 scale-90 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 bg-neutral-900/95 dark:bg-neutral-800/95 text-white border border-white/10 text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-50">
                 {item.label}
               </div>
@@ -55,7 +53,6 @@ export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOp
                 {item.icon}
               </motion.button>
 
-              {/* Индикатор активности */}
               <div className="h-1.5 flex items-center justify-center mt-1">
                 <div
                   className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${

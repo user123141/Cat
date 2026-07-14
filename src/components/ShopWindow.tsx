@@ -1,5 +1,5 @@
 // src/components/ShopWindow.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Skin, Cat, PlayerProfile } from '../types';
 import { CatRenderer } from './CatRenderer';
@@ -32,33 +32,6 @@ interface ShopWindowProps {
   onRedeemPromo?: (code: string) => { success: boolean; message: string };
 }
 
-const getConsumableIcon = (itemId: string, className: string = "w-8 h-8") => {
-  switch (itemId) {
-    case 'food_kibble':
-      return <Bone className={`${className} text-amber-500`} />;
-    case 'food_treat':
-      return <Sparkle className={`${className} text-pink-400`} />;
-    case 'food_tuna':
-      return <Fish className={`${className} text-sky-400`} />;
-    case 'food_steak':
-      return <Sparkles className={`${className} text-red-500`} />;
-    case 'soap_lavender':
-      return <Droplet className={`${className} text-purple-400`} />;
-    case 'soap_minerals':
-      return <Droplets className={`${className} text-cyan-400`} />;
-    case 'soap_charcoal':
-      return <Sparkles className={`${className} text-teal-400`} />;
-    case 'toy_wand':
-      return <Sparkle className={`${className} text-yellow-400`} />;
-    case 'toy_laser':
-      return <Sparkles className={`${className} text-red-400 animate-pulse`} />;
-    case 'toy_catnip':
-      return <Ghost className={`${className} text-emerald-400`} />;
-    default:
-      return <ShoppingBag className={`${className} text-slate-400`} />;
-  }
-};
-
 const DONATION_PACKS = [
   { id: 'pack_100', paws: 100, priceUah: 49, desc: 'Начальный набор лапок для мелких покупок.', badge: 'Популярно' },
   { id: 'pack_300', paws: 300, priceUah: 129, desc: 'Хороший старт. Хватит на пару крутых очков!', badge: 'Выгода 12%' },
@@ -66,6 +39,42 @@ const DONATION_PACKS = [
   { id: 'pack_1200', paws: 1200, priceUah: 399, desc: 'Премиум кошелек. Нарядите всех котиков!', badge: 'Скидка 20%' },
   { id: 'pack_3000', paws: 3000, priceUah: 799, desc: 'Кошачий олигарх! Разблокируйте вообще всё.', badge: 'Скидка 33%' },
 ];
+
+const getConsumableIcon = (itemId: string, className: string = "w-8 h-8") => {
+  switch (itemId) {
+    case 'food_kibble': return <Bone className={`${className} text-amber-500`} />;
+    case 'food_treat': return <Sparkle className={`${className} text-pink-400`} />;
+    case 'food_tuna': return <Fish className={`${className} text-sky-400`} />;
+    case 'food_steak': return <Sparkles className={`${className} text-red-500`} />;
+    case 'soap_lavender': return <Droplet className={`${className} text-purple-400`} />;
+    case 'soap_minerals': return <Droplets className={`${className} text-cyan-400`} />;
+    case 'soap_charcoal': return <Sparkles className={`${className} text-teal-400`} />;
+    case 'toy_wand': return <Sparkle className={`${className} text-yellow-400`} />;
+    case 'toy_laser': return <Sparkles className={`${className} text-red-400 animate-pulse`} />;
+    case 'toy_catnip': return <Ghost className={`${className} text-emerald-400`} />;
+    default: return <ShoppingBag className={`${className} text-slate-400`} />;
+  }
+};
+
+// Вспомогательная функция для определения слота по названию аксессуара
+const getAccessorySlot = (acc: string | undefined): { slot: 'hat' | 'glasses' | 'collar' | 'scarf' | 'boots' | 'wings' | null, value: string | undefined } => {
+  if (!acc) return { slot: null, value: undefined };
+  const lower = acc.toLowerCase();
+  if (lower.includes('hat') || lower.includes('crown') || lower.includes('halo') || lower.includes('cap') || lower.includes('shlyapa') || lower.includes('kolpak')) {
+    return { slot: 'hat', value: acc };
+  } else if (lower.includes('glasses') || lower.includes('headphones') || lower.includes('ochki') || lower.includes('naushniki')) {
+    return { slot: 'glasses', value: acc };
+  } else if (lower.includes('collar') || lower.includes('bell') || lower.includes('ribbon') || lower.includes('bow') || lower.includes('osheynik') || lower.includes('bantik')) {
+    return { slot: 'collar', value: acc };
+  } else if (lower.includes('scarf') || lower.includes('sharf')) {
+    return { slot: 'scarf', value: acc };
+  } else if (lower.includes('boots') || lower.includes('slippers') || lower.includes('tapochki') || lower.includes('sapozhki')) {
+    return { slot: 'boots', value: acc };
+  } else if (lower.includes('wings') || lower.includes('krylya')) {
+    return { slot: 'wings', value: acc };
+  }
+  return { slot: null, value: undefined };
+};
 
 export const ShopWindow: React.FC<ShopWindowProps> = ({
   profile,
@@ -79,11 +88,38 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
   onRedeemPromo,
 }) => {
   const [activeTab, setActiveTab] = useState<'skins' | 'accessories' | 'food' | 'hygiene' | 'topup'>('skins');
-  const [activeSubcategory, setActiveSubcategory] = useState<string>('all');
-  const [selectedSkinId, setSelectedSkinId] = useState<string>(allSkins[0]?.id || '');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [checkoutPack, setCheckoutPack] = useState<typeof DONATION_PACKS[0] | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'maccat_pay_sheet' | 'processing' | 'success'>('idle');
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState<number>(0);
+  const [promoError, setPromoError] = useState('');
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
+  const [isEditingCard, setIsEditingCard] = useState(false);
+  const [cardNumber, setCardNumber] = useState('7777 7777 7777 7777');
+  const [cardHolder, setCardHolder] = useState('Maksym Skorina Signature');
+  const [cardExpiry, setCardExpiry] = useState('12/30');
 
-  // Dynamic mapping of all items to a generic structure
-  const shopProducts = React.useMemo<ShopProduct[]>(() => {
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const diffX = e.changedTouches[0].clientX - touchStartX.current;
+    const diffY = e.changedTouches[0].clientY - touchStartY.current;
+    if (diffY > 100 && Math.abs(diffX) < 60) {
+      onMinimize();
+    }
+  };
+
+  const shopProducts = useMemo<ShopProduct[]>(() => {
     const products: ShopProduct[] = [];
 
     allSkins.forEach(skin => {
@@ -107,12 +143,13 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
           subcat = 'Головные уборы';
         } else if (accId.includes('glasses') || accId.includes('eyewear') || accId.includes('headphones') || accId.includes('ochki') || accId.includes('naushniki')) {
           subcat = 'Очки и Наушники';
-        } else if (accId.includes('collar') || accId.includes('bell') || accId.includes('ribbon') || accId.includes('bow') || accId.includes('scarf') || accId.includes('osheynik') || accId.includes('bantik') || accId.includes('sharf')) {
+        } else if (accId.includes('collar') || accId.includes('bell') || accId.includes('ribbon') || accId.includes('bow') || accId.includes('osheynik') || accId.includes('bantik')) {
           subcat = 'Шейные украшения';
+        } else if (accId.includes('scarf') || accId.includes('sharf')) {
+          subcat = 'Шарфы';
         } else if (accId.includes('wings') || accId.includes('krylya')) {
           subcat = 'Спина и Крылья';
         }
-
         products.push({
           id: skin.id,
           name: skin.name,
@@ -144,87 +181,23 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
     return products;
   }, [allSkins]);
 
-  const [checkoutPack, setCheckoutPack] = useState<typeof DONATION_PACKS[0] | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'maccat_pay_sheet' | 'processing' | 'success'>('idle');
-  const [promoInput, setPromoInput] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
-  const [promoDiscount, setPromoDiscount] = useState<number>(0);
-  const [promoError, setPromoError] = useState('');
+  const selectedProduct = shopProducts.find(p => p.id === selectedProductId);
 
-  const [isEditingCard, setIsEditingCard] = useState(false);
-  const [cardNumber, setCardNumber] = useState('7777 7777 7777 7777');
-  const [cardHolder, setCardHolder] = useState('Maksym Skorina Signature');
-  const [cardExpiry, setCardExpiry] = useState('12/30');
+  const closeModal = () => setSelectedProductId(null);
 
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [receiptData, setReceiptData] = useState<{
-    id: string;
-    date: string;
-    cardHolder: string;
-    cardNumber: string;
-    paws: number;
-    priceUah: number;
-    appliedPromo: string | null;
-    discount: number;
-    total: number;
-  } | null>(null);
-
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const diffX = e.changedTouches[0].clientX - touchStartX.current;
-    const diffY = e.changedTouches[0].clientY - touchStartY.current;
-    if (diffY > 100 && Math.abs(diffX) < 60) {
-      onMinimize();
-    }
-  };
-
-  if (!profile || !activeCat) return null;
-
-  const selectedItem = React.useMemo(() => {
-    const found = shopProducts.find(p => p.id === selectedSkinId);
-    if (found) return found;
-    const categoryProducts = shopProducts.filter(p => p.category === activeTab);
-    return categoryProducts[0] || shopProducts[0];
-  }, [shopProducts, selectedSkinId, activeTab]);
-
-  const categorizedProducts = React.useMemo<Record<string, ShopProduct[]>>(() => {
-    if (activeTab === 'topup') return {};
-    const filtered = shopProducts.filter(p => p.category === activeTab);
-    const groups: Record<string, ShopProduct[]> = {};
-    filtered.forEach(p => {
-      const sub = p.subcategory || 'Общие';
-      if (!groups[sub]) {
-        groups[sub] = [];
+  const handleModalAction = () => {
+    if (!selectedProduct || !profile || !activeCat) return;
+    if (selectedProduct.category === 'food' || selectedProduct.category === 'hygiene') {
+      onPurchase(selectedProduct.id);
+    } else {
+      if (profile.unlockedSkins.includes(selectedProduct.id)) {
+        onApply(activeCat.id, selectedProduct.id);
+      } else {
+        onPurchase(selectedProduct.id);
       }
-      groups[sub].push(p);
-    });
-    return groups;
-  }, [shopProducts, activeTab]);
-
-  const subcategories = React.useMemo<string[]>(() => {
-    if (activeTab === 'topup') return [];
-    const filtered = shopProducts.filter(p => p.category === activeTab);
-    const subs = new Set<string>();
-    filtered.forEach(p => {
-      subs.add(p.subcategory || 'Общие');
-    });
-    return ['all', ...Array.from(subs)];
-  }, [shopProducts, activeTab]);
-
-  const filteredCategorizedProducts = React.useMemo<Record<string, ShopProduct[]>>(() => {
-    if (activeSubcategory === 'all') return categorizedProducts;
-    if (!categorizedProducts[activeSubcategory]) return {};
-    return { [activeSubcategory]: categorizedProducts[activeSubcategory] };
-  }, [categorizedProducts, activeSubcategory]);
-
-  const isConsumableProduct = selectedItem.category === 'food' || selectedItem.category === 'hygiene';
+    }
+    closeModal();
+  };
 
   const getRarityStyle = (rarity: string) => {
     switch (rarity) {
@@ -244,113 +217,58 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
     }
   };
 
-  const isAccessory = selectedItem.category === 'accessories';
-  const previewSkin = isAccessory ? activeCat.skinId : selectedItem.id;
-  const previewAccessory = isAccessory ? (selectedItem.originalItem as any).accessory : (activeCat as any).accessory;
+  const isProductOwned = (product: ShopProduct) => {
+    if (product.category === 'food' || product.category === 'hygiene') {
+      return (profile?.inventory?.[product.id] || 0) > 0;
+    }
+    return profile?.unlockedSkins.includes(product.id) || false;
+  };
 
-  const activeSkinColors = () => {
-    const s = allSkins.find((item) => item.id === previewSkin);
-    if (s) {
-      return { color: s.color, patternColor: s.patternColor, eyeColor: s.eyeColor };
+  const isProductEquipped = (product: ShopProduct) => {
+    if (!activeCat) return false;
+    if (product.category === 'accessories') {
+      const acc = (product.originalItem as Skin).accessory;
+      const { slot } = getAccessorySlot(acc);
+      if (slot === 'hat') return activeCat.hat === acc;
+      if (slot === 'glasses') return activeCat.glasses === acc;
+      if (slot === 'collar') return activeCat.collar === acc;
+      if (slot === 'scarf') return activeCat.scarf === acc;
+      if (slot === 'boots') return activeCat.boots === acc;
+      if (slot === 'wings') return activeCat.wings === acc;
+      return activeCat.accessory === acc;
+    }
+    if (product.category === 'skins') {
+      return activeCat.skinId === product.id;
+    }
+    return false;
+  };
+
+  const getPreviewSkinColors = () => {
+    if (!activeCat) return { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
+    const skin = allSkins.find(s => s.id === activeCat.skinId);
+    if (skin) {
+      return { color: skin.color, patternColor: skin.patternColor, eyeColor: skin.eyeColor };
     }
     return { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
   };
 
-  const colors = activeSkinColors();
+  const previewColors = getPreviewSkinColors();
 
-  const handleCheckoutStart = (pack: typeof DONATION_PACKS[0]) => {
-    triggerHaptic();
-    setCheckoutPack(pack);
-    setPromoInput('');
-    setPromoError('');
-    setAppliedPromo(null);
-    setPromoDiscount(0);
-    setPaymentStatus('maccat_pay_sheet');
-  };
+  const filteredProducts = shopProducts.filter(p => p.category === activeTab);
 
-  const applyPromoCode = () => {
-    triggerHaptic();
-    const cleanPromo = promoInput.trim().toUpperCase();
-    if (!cleanPromo) {
-      setPromoError('Введите промокод');
-      return;
-    }
-
-    if (onRedeemPromo) {
-      const res = onRedeemPromo(cleanPromo);
-      if (res.success) {
-        setAppliedPromo(cleanPromo);
-        if (cleanPromo === 'ILOVEAMINA') {
-          setPromoDiscount(1.0);
-        } else if (cleanPromo === 'MAKSMINIMALISM') {
-          setPromoDiscount(0.5);
-        } else if (cleanPromo === 'MAKSPAY') {
-          setPromoDiscount(0.3);
-        } else {
-          setPromoDiscount(0.2);
-        }
-        setPromoError('');
-      } else {
-        setPromoError(res.message);
-        setAppliedPromo(null);
-        setPromoDiscount(0);
+  const groupedProducts = useMemo(() => {
+    const groups: Record<string, ShopProduct[]> = {};
+    filteredProducts.forEach(p => {
+      const sub = p.subcategory || 'Общие';
+      if (!groups[sub]) {
+        groups[sub] = [];
       }
-    } else {
-      if (cleanPromo === 'ILOVEAMINA') {
-        setAppliedPromo('ILOVEAMINA');
-        setPromoDiscount(1.0);
-        setPromoError('');
-      } else if (cleanPromo === 'MAKSMINIMALISM') {
-        setAppliedPromo('MAKSMINIMALISM');
-        setPromoDiscount(0.5);
-        setPromoError('');
-      } else if (cleanPromo === 'MAKSPAY') {
-        setAppliedPromo('MAKSPAY');
-        setPromoDiscount(0.3);
-        setPromoError('');
-      } else {
-        setPromoError('Неверный или уже использованный промокод');
-        setAppliedPromo(null);
-        setPromoDiscount(0);
-      }
-    }
-  };
+      groups[sub].push(p);
+    });
+    return groups;
+  }, [filteredProducts]);
 
-  const confirmPayment = () => {
-    triggerHaptic();
-    setPaymentStatus('processing');
-
-    setTimeout(() => {
-      setPaymentStatus('success');
-      if (checkoutPack) {
-        onDonatePaws(checkoutPack.paws);
-        const transId = `MP-${Math.floor(100000 + Math.random() * 900000)}`;
-        const now = new Date();
-        const formattedDate = now.toLocaleDateString('ru-RU', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
-
-        setReceiptData({
-          id: transId,
-          date: formattedDate,
-          cardHolder: cardHolder || 'Maksym Skorina Signature',
-          cardNumber: cardNumber || '7777 7777 7777 7777',
-          paws: checkoutPack.paws,
-          priceUah: checkoutPack.priceUah,
-          appliedPromo: appliedPromo,
-          discount: promoDiscount,
-          total: Math.max(0, Math.round(checkoutPack.priceUah * (1 - promoDiscount))),
-        });
-      }
-    }, 1800);
-  };
-
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  if (!profile || !activeCat) return null;
 
   return (
     <MacCatWindowFrame
@@ -362,377 +280,161 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
       headerRight={
         <div className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-400/20 px-3 py-1 rounded-full pointer-events-auto shrink-0 text-sky-400">
           <Sparkles size={11} className="animate-pulse" />
-          <span className="text-xs font-extrabold font-mono">
-            {profile.paws}
-          </span>
+          <span className="text-xs font-extrabold font-mono">{profile.paws}</span>
         </div>
       }
     >
-      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
-        
-        {activeTab !== 'topup' && (
-          <div className="hidden lg:flex lg:w-60 bg-black/25 border-r border-white/5 p-4 flex-col items-center justify-center text-center shrink-0">
-            {isConsumableProduct ? (
-              <>
-                <span className="text-[9px] font-mono tracking-wider text-slate-400 uppercase mb-2 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
-                  Карточка товара
-                </span>
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className="flex gap-1 p-2 bg-black/30 border-b border-white/5 shrink-0 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setActiveTab('skins')}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all ${
+              activeTab === 'skins' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Окрасы
+          </button>
+          <button
+            onClick={() => setActiveTab('accessories')}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all ${
+              activeTab === 'accessories' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Аксессуары
+          </button>
+          <button
+            onClick={() => setActiveTab('food')}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all ${
+              activeTab === 'food' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Питание
+          </button>
+          <button
+            onClick={() => setActiveTab('hygiene')}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all ${
+              activeTab === 'hygiene' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Гигиена
+          </button>
+          <button
+            onClick={() => setActiveTab('topup')}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all ${
+              activeTab === 'topup' ? 'bg-amber-500 text-white' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Пополнить
+          </button>
+        </div>
 
-                <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center justify-center shadow-inner relative overflow-hidden animate-fade-in">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10" />
-                  <div className="filter drop-shadow-md">{getConsumableIcon(selectedItem.id, "w-14 h-14 md:w-16 md:h-16")}</div>
-                  <div className="absolute bottom-2 bg-black/50 border border-white/10 px-2 py-0.5 rounded-full text-[9px] text-slate-300 font-mono">
-                    В запасе: <span className="font-bold text-amber-300">{profile.inventory?.[selectedItem.id] || 0} шт</span>
-                  </div>
-                </div>
-
-                <h3 className="text-xs font-bold text-white mt-3">{selectedItem.name}</h3>
-                
-                <div className={`mt-1 px-2 py-0.5 rounded text-[8px] font-black border uppercase tracking-wider ${getRarityStyle(selectedItem.rarity)}`}>
-                  {getRarityLabel(selectedItem.rarity)}
-                </div>
-
-                <div className="mt-2.5 space-y-1 bg-white/5 border border-white/5 p-2 rounded-xl w-full text-left text-[10px]">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Действие:</span>
-                    <span className="font-extrabold text-white">
-                      {(selectedItem.originalItem as any).type === 'food' ? '🍗 Насыщение' : (selectedItem.originalItem as any).type === 'soap' ? '🧼 Гигиена' : '🎾 Радость'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Эффект:</span>
-                    <span className="font-extrabold text-emerald-400">+{(selectedItem.originalItem as any).boost}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Опыт кота:</span>
-                    <span className="font-extrabold text-sky-400">+{(selectedItem.originalItem as any).xpBoost} XP</span>
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-slate-400 mt-2 max-w-xs leading-normal max-lg:hidden">
-                  {selectedItem.description}
-                </p>
-
-                <div className="w-full mt-3">
-                  <button
-                    disabled={profile.paws < selectedItem.cost}
-                    onClick={() => {
-                      triggerHaptic();
-                      onPurchase(selectedItem.id);
-                    }}
-                    className={`w-full py-3 rounded-xl text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition-all active:scale-95 border min-h-[44px] ${
-                      profile.paws < selectedItem.cost
-                        ? 'bg-slate-800 border-white/5 text-slate-400 cursor-not-allowed opacity-60'
-                        : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 cursor-pointer border-emerald-400/15 shadow-lg shadow-emerald-500/10'
-                    }`}
-                  >
-                    <ShoppingBag size={11} />
-                    <span>
-                      {profile.paws < selectedItem.cost
-                        ? `Недостаточно лапок (${selectedItem.cost})`
-                        : `Купить за ${selectedItem.cost}`}
-                    </span>
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <span className="text-[9px] font-mono tracking-wider text-slate-400 uppercase mb-2 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
-                  Кабина примерки
-                </span>
-
-                <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center shadow-inner relative overflow-hidden">
-                  <CatRenderer
-                    breed={isAccessory ? activeCat.breed : (selectedItem.originalItem as any).breed}
-                    color={colors.color}
-                    patternColor={colors.patternColor}
-                    eyeColor={colors.eyeColor}
-                    accessory={previewAccessory}
-                    status="idle"
-                    size={110}
-                  />
-                </div>
-
-                <h3 className="text-xs font-bold text-white mt-3">{selectedItem.name}</h3>
-                
-                <div className={`mt-1 px-2 py-0.5 rounded text-[8px] font-black border uppercase tracking-wider ${getRarityStyle(selectedItem.rarity)}`}>
-                  {getRarityLabel(selectedItem.rarity)}
-                </div>
-
-                <p className="text-[10px] text-slate-400 mt-1 max-w-xs leading-normal max-lg:hidden">
-                  {selectedItem.description}
-                </p>
-
-                <div className="w-full mt-3">
-                  {profile.unlockedSkins.includes(selectedItem.id) ? (
-                    <button
-                      onClick={() => {
-                        triggerHaptic();
-                        onApply(activeCat.id, selectedItem.id);
-                      }}
-                      className={`w-full py-3 rounded-xl font-bold text-[11px] cursor-pointer flex items-center justify-center gap-1.5 transition-all active:scale-95 border min-h-[44px] ${
-                        activeCat.skinId === selectedItem.id || (isAccessory && (activeCat as any).accessory === selectedItem.originalItem.accessory)
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-black'
-                          : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200'
-                      }`}
-                    >
-                      {activeCat.skinId === selectedItem.id || (isAccessory && (activeCat as any).accessory === selectedItem.originalItem.accessory) ? (
-                        <>
-                          <Check size={11} />
-                          <span>Надето</span>
-                        </>
-                      ) : (
-                        <span>Надеть</span>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      disabled={profile.paws < selectedItem.cost}
-                      onClick={() => {
-                        triggerHaptic();
-                        onPurchase(selectedItem.id);
-                      }}
-                      className={`w-full py-3 rounded-xl text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition-all active:scale-95 border min-h-[44px] ${
-                        profile.paws < selectedItem.cost
-                          ? 'bg-slate-800 border-white/5 text-slate-400 cursor-not-allowed opacity-60'
-                          : 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 cursor-pointer border-sky-400/15 shadow-lg shadow-sky-500/10'
-                      }`}
-                    >
-                      <ShoppingBag size={11} />
-                      <span>
-                        {profile.paws < selectedItem.cost
-                          ? `Недостаточно лапок (${selectedItem.cost})`
-                          : `Купить за ${selectedItem.cost}`}
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ПРАВАЯ КОЛОНКА — ИСПРАВЛЕННЫЕ ТАБЫ И КОНТЕНТ */}
-        <div className="flex-1 flex flex-col min-h-0 relative bg-slate-950/20">
-          <div className="flex-1 overflow-y-auto p-4 md:p-5 pb-24 lg:pb-5">
-          
-          {/* 1. КОНТЕЙНЕР С ТАБАМИ (Здесь была ошибка на скриншоте) */}
-          <div className="flex flex-shrink-0 w-full overflow-x-auto no-scrollbar mb-4">
-            <div className="flex bg-black/40 border border-white/5 rounded-xl p-1 min-h-[44px] w-full max-w-full lg:max-w-md mx-auto lg:mx-0 text-[11px] font-bold gap-1">
-              <button
-                onClick={() => {
-                  setActiveTab('skins');
-                  setActiveSubcategory('all');
-                  const firstSkin = shopProducts.find(p => p.category === 'skins');
-                  if (firstSkin) setSelectedSkinId(firstSkin.id);
-                }}
-                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
-                  activeTab === 'skins' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Кошачьи окрасы
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('accessories');
-                  setActiveSubcategory('all');
-                  const firstAcc = shopProducts.find(p => p.category === 'accessories');
-                  if (firstAcc) setSelectedSkinId(firstAcc.id);
-                }}
-                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
-                  activeTab === 'accessories' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Аксессуары
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('food');
-                  setActiveSubcategory('all');
-                  const firstFood = shopProducts.find(p => p.category === 'food');
-                  if (firstFood) setSelectedSkinId(firstFood.id);
-                }}
-                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
-                  activeTab === 'food' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Питание
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('hygiene');
-                  setActiveSubcategory('all');
-                  const firstHyg = shopProducts.find(p => p.category === 'hygiene');
-                  if (firstHyg) setSelectedSkinId(firstHyg.id);
-                }}
-                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
-                  activeTab === 'hygiene' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Гигиена
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('topup');
-                  setActiveSubcategory('all');
-                }}
-                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
-                  activeTab === 'topup' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Пополнить
-              </button>
-            </div>
-          </div>
-
-          {activeTab !== 'topup' && subcategories.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 border-b border-white/5 mb-4 shrink-0">
-              {subcategories.map((sub) => {
-                const isSelected = activeSubcategory === sub;
-                return (
-                  <button
-                    key={sub}
-                    onClick={() => {
-                      triggerHaptic();
-                      setActiveSubcategory(sub);
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
-                      isSelected
-                        ? 'bg-sky-500/15 border-sky-500/40 text-sky-400 font-extrabold shadow-sm'
-                        : 'bg-white/5 border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {sub === 'all' ? 'Все товары' : sub}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
+        <div className="flex-1 overflow-y-auto p-3 md:p-5 bg-slate-950/30">
           {activeTab !== 'topup' ? (
-            <div className="flex-1 flex flex-col space-y-6 pb-3">
-              {Object.entries(filteredCategorizedProducts).map(([subcatName, productsValue]) => {
-                const products = productsValue as ShopProduct[];
-                return (
-                  <div key={subcatName} className="space-y-2">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-white/5 pb-1 flex items-center gap-1.5">
-                      <Sparkle size={10} className="text-sky-400" />
-                      {subcatName} ({products.length})
-                    </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {products.map((item) => {
-                        const isSelected = item.id === selectedSkinId;
-                        const isConsumable = item.category === 'food' || item.category === 'hygiene';
-                        const currentQty = profile.inventory?.[item.id] || 0;
-                        
-                        const isUnlocked = profile.unlockedSkins.includes(item.id);
-                        const isEquipped = activeCat.skinId === item.id || ((item.originalItem as any).accessory && (activeCat as any).accessory === (item.originalItem as any).accessory);
+            <div className="space-y-6">
+              {Object.entries(groupedProducts).map(([subcategory, products]) => (
+                <div key={subcategory}>
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-white/5 pb-1.5 mb-2 flex items-center gap-1.5">
+                    <Sparkle size={10} className="text-sky-400" />
+                    {subcategory} ({products.length})
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {products.map((product) => {
+                      const owned = isProductOwned(product);
+                      const equipped = isProductEquipped(product);
+                      const isConsumable = product.category === 'food' || product.category === 'hygiene';
+                      const qty = profile.inventory?.[product.id] || 0;
 
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              triggerHaptic();
-                              setSelectedSkinId(item.id);
-                            }}
-                            className={`relative p-3 rounded-2xl border transition-all cursor-pointer flex flex-col items-center text-center justify-between group h-[135px] ${
-                              isSelected
-                                ? 'bg-sky-500/10 border-sky-500 shadow-md'
-                                : 'bg-white/5 border-transparent hover:bg-white/10'
-                            }`}
-                          >
-                            {isConsumable && currentQty > 0 && (
-                              <div className="absolute top-1.5 left-1.5 bg-amber-500 text-black font-extrabold text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                {currentQty} шт
-                              </div>
-                            )}
+                      // Определяем слот для аксессуара
+                      let accessoryProps = {};
+                      if (product.category === 'accessories') {
+                        const acc = (product.originalItem as Skin).accessory;
+                        const { slot } = getAccessorySlot(acc);
+                        if (slot) {
+                          accessoryProps = { [slot]: acc };
+                        } else {
+                          accessoryProps = { accessory: acc };
+                        }
+                      }
 
-                            {!isConsumable && isEquipped && (
-                              <div className="absolute top-1.5 left-1.5 bg-emerald-500 text-white font-extrabold text-[7px] px-1 py-0.5 rounded uppercase tracking-wider">
-                                Надето
-                              </div>
-                            )}
-
-                            {!isConsumable && isUnlocked && !isEquipped && (
-                              <div className="absolute top-1.5 right-1.5 bg-slate-500/10 text-slate-300 border border-slate-500/20 text-[7px] font-bold px-1 rounded uppercase">
-                                В шкафу
-                              </div>
-                            )}
-
-                            <div className="w-14 h-14 rounded-xl bg-black/40 flex items-center justify-center my-1.5 group-hover:scale-105 transition-transform overflow-hidden relative">
-                              {isConsumable ? (
-                                getConsumableIcon(item.id, "w-8 h-8")
-                              ) : (
-                                <CatRenderer
-                                  breed={(item.originalItem as any).accessory ? activeCat.breed : (item.originalItem as Skin).breed}
-                                  color={(item.originalItem as any).accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).color : (item.originalItem as Skin).color}
-                                  patternColor={(item.originalItem as any).accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).patternColor : (item.originalItem as Skin).patternColor}
-                                  eyeColor={(item.originalItem as any).accessory ? (allSkins.find(s => s.id === activeCat.skinId) || allSkins[0]).eyeColor : (item.originalItem as Skin).eyeColor}
-                                  accessory={(item.originalItem as any).accessory ? (item.originalItem as Skin).accessory : undefined}
-                                  status="idle"
-                                  size={64}
-                                />
-                              )}
+                      return (
+                        <button
+                          key={product.id}
+                          onClick={() => setSelectedProductId(product.id)}
+                          className="relative p-3 rounded-2xl border bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/10 transition-all flex flex-col items-center text-center gap-1.5"
+                        >
+                          {owned && !isConsumable && (
+                            <div className="absolute top-1.5 right-1.5 text-[8px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full">
+                              {equipped ? 'Надето' : 'В шкафу'}
                             </div>
-
-                            <div className="w-full">
-                              <h4 className="text-[11px] font-bold text-slate-200 truncate leading-tight">{item.name}</h4>
-                              <p className="text-[9px] text-sky-400 font-extrabold font-mono mt-0.5">
-                                {isConsumable ? `${item.cost} лапок` : isUnlocked ? 'В наличии' : `${item.cost} лапок`}
-                              </p>
+                          )}
+                          {isConsumable && qty > 0 && (
+                            <div className="absolute top-1.5 right-1.5 text-[8px] font-bold bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full">
+                              {qty} шт
                             </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                          )}
+                          <div className="w-16 h-16 md:w-20 md:h-20 bg-black/30 rounded-xl flex items-center justify-center">
+                            {isConsumable ? (
+                              getConsumableIcon(product.id, "w-8 h-8 md:w-10 md:h-10")
+                            ) : (
+                              <CatRenderer
+                                breed={product.category === 'accessories' ? activeCat.breed : (product.originalItem as Skin).breed || activeCat.breed}
+                                color={product.category === 'accessories' ? previewColors.color : (product.originalItem as Skin).color || previewColors.color}
+                                patternColor={product.category === 'accessories' ? previewColors.patternColor : (product.originalItem as Skin).patternColor || previewColors.patternColor}
+                                eyeColor={product.category === 'accessories' ? previewColors.eyeColor : (product.originalItem as Skin).eyeColor || previewColors.eyeColor}
+                                {...accessoryProps}
+                                status="idle"
+                                size={60}
+                              />
+                            )}
+                          </div>
+                          <h4 className="text-[10px] md:text-xs font-bold text-slate-200 truncate w-full">{product.name}</h4>
+                          <p className="text-[9px] text-sky-400 font-mono font-bold">
+                            {isConsumable ? `${product.cost} 🐾` : owned ? 'В наличии' : `${product.cost} 🐾`}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           ) : (
-            <div className="flex-1 flex flex-col space-y-4">
-              <div className="text-left bg-white/5 border border-white/5 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                <div>
-                  <h3 className="text-xs font-black text-white flex items-center gap-1">
-                    <Sparkles size={13} className="text-amber-400 animate-pulse" />
-                    Магазин лапок Care OS
-                  </h3>
-                  <p className="text-[10px] text-slate-400 leading-normal mt-0.5">
-                    Получайте лапки мгновенно для быстрой прокачки и разблокировки редких аксессуаров. Фиксированный курс: <span className="font-extrabold text-sky-400">500 лапок = 199 грн</span>.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[9px] font-bold text-emerald-400 shrink-0 self-start sm:self-auto">
-                  <ShieldCheck size={11} />
-                  <span>Безопасная касса</span>
-                </div>
+            <div className="space-y-4">
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-3 text-left">
+                <h3 className="text-xs font-black text-white flex items-center gap-1">
+                  <Sparkles size={13} className="text-amber-400" />
+                  Магазин лапок Care OS
+                </h3>
+                <p className="text-[10px] text-slate-400 leading-normal mt-0.5">
+                  Получайте лапки мгновенно для быстрой прокачки и разблокировки редких аксессуаров. Фиксированный курс: <span className="font-extrabold text-sky-400">500 лапок = 199 грн</span>.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {DONATION_PACKS.map((pack) => (
-                  <div
-                    key={pack.id}
-                    className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 hover:border-white/10 flex flex-col justify-between transition-all relative h-[145px]"
-                  >
-                    <span className="absolute top-2.5 right-2.5 text-[8px] font-bold bg-amber-500/20 border border-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full uppercase">
+                  <div key={pack.id} className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 hover:border-white/10 transition-all relative">
+                    <span className="absolute top-2 right-2 text-[8px] font-bold bg-amber-500/20 border border-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full">
                       {pack.badge}
                     </span>
-
                     <div className="flex items-center gap-2.5">
                       <ShoppingBag size={24} className="text-amber-500 shrink-0" />
                       <div className="text-left">
                         <h4 className="text-xs font-black text-white">+{pack.paws} лапок</h4>
-                        <span className="text-[9px] text-slate-400 leading-none">{pack.desc}</span>
+                        <span className="text-[9px] text-slate-400">{pack.desc}</span>
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between mt-3 border-t border-white/5 pt-2.5">
+                    <div className="flex items-center justify-between mt-2 border-t border-white/5 pt-2">
                       <span className="text-xs font-black text-white">{pack.priceUah} грн</span>
                       <button
-                        onClick={() => handleCheckoutStart(pack)}
-                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 shadow-md shadow-amber-500/10"
+                        onClick={() => {
+                          triggerHaptic();
+                          setCheckoutPack(pack);
+                          setPaymentStatus('maccat_pay_sheet');
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-[10px] font-black transition-all active:scale-95"
                       >
-                        <CreditCard size={11} />
-                        <span>Купить</span>
+                        <CreditCard size={11} className="inline mr-1" />
+                        Купить
                       </button>
                     </div>
                   </div>
@@ -740,87 +442,117 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
               </div>
             </div>
           )}
-          </div>
-
-          {/* Mobile Quick Buy/Equip Floating Bar */}
-          {activeTab !== 'topup' && (
-            <div className="lg:hidden absolute bottom-3 left-3 right-3 bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 flex items-center justify-between gap-3 shadow-2xl z-10">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-9 h-9 bg-black/40 rounded-xl flex items-center justify-center text-xl shrink-0">
-                  {isConsumableProduct ? getConsumableIcon(selectedItem.id, "w-5 h-5") : selectedItem.emoji || '✨'}
-                </div>
-                <div className="min-w-0 text-left">
-                  <h4 className="text-[10px] font-extrabold text-white truncate">{selectedItem.name}</h4>
-                  <p className="text-[9px] text-slate-400">
-                    {isConsumableProduct 
-                      ? `В наличии: ${profile.inventory?.[selectedItem.id] || 0} шт` 
-                      : profile.unlockedSkins.includes(selectedItem.id) ? 'Уже разблокировано' : `${selectedItem.cost} 🐾`
-                    }
-                  </p>
-                </div>
-              </div>
-
-              {/* Buy / Equip Button */}
-              <div className="shrink-0">
-                {isConsumableProduct ? (
-                  <button
-                    disabled={profile.paws < selectedItem.cost}
-                    onClick={() => {
-                      triggerHaptic();
-                      onPurchase(selectedItem.id);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-white font-black text-[9px] flex items-center gap-1 transition-all active:scale-95 border min-h-[36px] ${
-                      profile.paws < selectedItem.cost
-                        ? 'bg-slate-800 border-white/5 text-slate-400 cursor-not-allowed opacity-60'
-                        : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 border-emerald-400/15 shadow-md shadow-emerald-500/10'
-                    }`}
-                  >
-                    <ShoppingBag size={10} />
-                    <span>Купить за {selectedItem.cost} 🐾</span>
-                  </button>
-                ) : profile.unlockedSkins.includes(selectedItem.id) ? (
-                  <button
-                    onClick={() => {
-                      triggerHaptic();
-                      onApply(activeCat.id, selectedItem.id);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg font-black text-[9px] cursor-pointer flex items-center gap-1.5 transition-all active:scale-95 border min-h-[36px] ${
-                      activeCat.skinId === selectedItem.id || (isAccessory && (activeCat as any).accessory === selectedItem.originalItem.accessory)
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                        : 'bg-white/10 hover:bg-white/15 border-white/10 text-slate-200'
-                    }`}
-                  >
-                    {activeCat.skinId === selectedItem.id || (isAccessory && (activeCat as any).accessory === selectedItem.originalItem.accessory) ? (
-                      <>
-                        <Check size={10} />
-                        <span>Надето</span>
-                      </>
-                    ) : (
-                      <span>Надеть</span>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    disabled={profile.paws < selectedItem.cost}
-                    onClick={() => {
-                      triggerHaptic();
-                      onPurchase(selectedItem.id);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-white font-black text-[9px] flex items-center gap-1 transition-all active:scale-95 border min-h-[36px] ${
-                      profile.paws < selectedItem.cost
-                        ? 'bg-slate-800 border-white/5 text-slate-400 cursor-not-allowed opacity-60'
-                        : 'bg-sky-500 hover:bg-sky-600 border-sky-400/15 shadow-md shadow-sky-500/10'
-                    }`}
-                  >
-                    <ShoppingBag size={10} />
-                    <span>Купить за {selectedItem.cost} 🐾</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {selectedProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50"
+            onClick={closeModal}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 30 }}
+              className="bg-slate-900/95 border border-white/10 rounded-3xl p-5 max-w-sm w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-start mb-3">
+                <h3 className="text-sm font-bold text-white">{selectedProduct.name}</h3>
+                <button onClick={closeModal} className="p-1 rounded-full bg-white/5 hover:bg-white/10">
+                  <X size={18} className="text-slate-400" />
+                </button>
+              </div>
+
+              <div className="flex flex-col items-center">
+                <div className="w-32 h-32 bg-black/30 rounded-2xl flex items-center justify-center mb-3">
+                  {selectedProduct.category === 'food' || selectedProduct.category === 'hygiene' ? (
+                    <div className="text-5xl">{selectedProduct.emoji || '🎁'}</div>
+                  ) : (
+                    (() => {
+                      // Для модалки показываем комбинацию: все текущие слоты + продаваемый аксессуар
+                      let modalProps = {
+                        hat: activeCat.hat,
+                        glasses: activeCat.glasses,
+                        collar: activeCat.collar,
+                        scarf: activeCat.scarf,
+                        boots: activeCat.boots,
+                        wings: activeCat.wings,
+                        accessory: activeCat.accessory,
+                      };
+                      if (selectedProduct.category === 'accessories') {
+                        const acc = (selectedProduct.originalItem as Skin).accessory;
+                        const { slot } = getAccessorySlot(acc);
+                        if (slot) {
+                          modalProps = { ...modalProps, [slot]: acc };
+                        } else {
+                          modalProps = { ...modalProps, accessory: acc };
+                        }
+                      }
+                      return (
+                        <CatRenderer
+                          breed={selectedProduct.category === 'accessories' ? activeCat.breed : (selectedProduct.originalItem as Skin).breed || activeCat.breed}
+                          color={selectedProduct.category === 'accessories' ? previewColors.color : (selectedProduct.originalItem as Skin).color || previewColors.color}
+                          patternColor={selectedProduct.category === 'accessories' ? previewColors.patternColor : (selectedProduct.originalItem as Skin).patternColor || previewColors.patternColor}
+                          eyeColor={selectedProduct.category === 'accessories' ? previewColors.eyeColor : (selectedProduct.originalItem as Skin).eyeColor || previewColors.eyeColor}
+                          {...modalProps}
+                          status="idle"
+                          size={100}
+                        />
+                      );
+                    })()
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-400 text-center mb-2">{selectedProduct.description}</p>
+
+                {selectedProduct.category === 'accessories' && (
+                  <div className="text-[10px] text-slate-300 mb-2">
+                    Слот: <span className="font-bold text-sky-400">
+                      {(() => {
+                        const acc = (selectedProduct.originalItem as Skin).accessory;
+                        const lower = acc?.toLowerCase() || '';
+                        if (lower.includes('hat') || lower.includes('crown') || lower.includes('halo') || lower.includes('cap') || lower.includes('shlyapa') || lower.includes('kolpak')) return 'Головной убор';
+                        if (lower.includes('glasses') || lower.includes('headphones') || lower.includes('ochki') || lower.includes('naushniki')) return 'Очки/Наушники';
+                        if (lower.includes('collar') || lower.includes('bell') || lower.includes('ribbon') || lower.includes('bow') || lower.includes('osheynik') || lower.includes('bantik')) return 'Ошейник/Бантик';
+                        if (lower.includes('scarf') || lower.includes('sharf')) return 'Шарф';
+                        if (lower.includes('boots') || lower.includes('slippers') || lower.includes('tapochki') || lower.includes('sapozhki')) return 'Обувь';
+                        if (lower.includes('wings') || lower.includes('krylya')) return 'Крылья';
+                        return 'Аксессуар';
+                      })()}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs font-bold text-sky-400">🐾 {selectedProduct.cost} лапок</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getRarityStyle(selectedProduct.rarity)}`}>
+                    {getRarityLabel(selectedProduct.rarity)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleModalAction}
+                  disabled={profile.paws < selectedProduct.cost && !isProductOwned(selectedProduct)}
+                  className="w-full py-3 rounded-xl text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {selectedProduct.category === 'food' || selectedProduct.category === 'hygiene' ? (
+                    isProductOwned(selectedProduct) ? 'Использовать' : 'Купить'
+                  ) : isProductOwned(selectedProduct) ? (
+                    isProductEquipped(selectedProduct) ? 'Снять' : 'Надеть'
+                  ) : (
+                    'Купить'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {checkoutPack && paymentStatus !== 'idle' && (
@@ -997,7 +729,47 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                         className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 uppercase font-mono tracking-wider h-full"
                       />
                       <button
-                        onClick={applyPromoCode}
+                        onClick={() => {
+                          triggerHaptic();
+                          const cleanPromo = promoInput.trim().toUpperCase();
+                          if (!cleanPromo) {
+                            setPromoError('Введите промокод');
+                            return;
+                          }
+                          if (onRedeemPromo) {
+                            const res = onRedeemPromo(cleanPromo);
+                            if (res.success) {
+                              setAppliedPromo(cleanPromo);
+                              if (cleanPromo === 'ILOVEAMINA') setPromoDiscount(1.0);
+                              else if (cleanPromo === 'MAKSMINIMALISM') setPromoDiscount(0.5);
+                              else if (cleanPromo === 'MAKSPAY') setPromoDiscount(0.3);
+                              else setPromoDiscount(0.2);
+                              setPromoError('');
+                            } else {
+                              setPromoError(res.message);
+                              setAppliedPromo(null);
+                              setPromoDiscount(0);
+                            }
+                          } else {
+                            if (cleanPromo === 'ILOVEAMINA') {
+                              setAppliedPromo('ILOVEAMINA');
+                              setPromoDiscount(1.0);
+                              setPromoError('');
+                            } else if (cleanPromo === 'MAKSMINIMALISM') {
+                              setAppliedPromo('MAKSMINIMALISM');
+                              setPromoDiscount(0.5);
+                              setPromoError('');
+                            } else if (cleanPromo === 'MAKSPAY') {
+                              setAppliedPromo('MAKSPAY');
+                              setPromoDiscount(0.3);
+                              setPromoError('');
+                            } else {
+                              setPromoError('Неверный или уже использованный промокод');
+                              setAppliedPromo(null);
+                              setPromoDiscount(0);
+                            }
+                          }
+                        }}
                         className="px-4 bg-white/10 hover:bg-white/15 active:scale-95 text-xs text-white font-bold rounded-xl transition-all cursor-pointer h-full"
                       >
                         Применить
@@ -1014,7 +786,37 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                   </div>
 
                   <button
-                    onClick={confirmPayment}
+                    onClick={() => {
+                      triggerHaptic();
+                      setPaymentStatus('processing');
+                      setTimeout(() => {
+                        setPaymentStatus('success');
+                        if (checkoutPack) {
+                          onDonatePaws(checkoutPack.paws);
+                          const transId = `MP-${Math.floor(100000 + Math.random() * 900000)}`;
+                          const now = new Date();
+                          const formattedDate = now.toLocaleDateString('ru-RU', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                          });
+                          setReceiptData({
+                            id: transId,
+                            date: formattedDate,
+                            cardHolder: cardHolder || 'Maksym Skorina Signature',
+                            cardNumber: cardNumber || '7777 7777 7777 7777',
+                            paws: checkoutPack.paws,
+                            priceUah: checkoutPack.priceUah,
+                            appliedPromo: appliedPromo,
+                            discount: promoDiscount,
+                            total: Math.max(0, Math.round(checkoutPack.priceUah * (1 - promoDiscount))),
+                          });
+                        }
+                      }, 1800);
+                    }}
                     className="w-full h-12 rounded-2xl bg-white text-black hover:bg-slate-100 font-bold text-xs tracking-wide transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 shadow-lg mt-2"
                   >
                     <CreditCard size={13} />

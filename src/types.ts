@@ -1,5 +1,4 @@
 // src/types.ts
-
 export interface Cat {
   id: string;
   name: string;
@@ -7,16 +6,21 @@ export interface Cat {
   skinId: string;
   level: number;
   xp: number;
-  hunger: number;      // 0-100
-  happiness: number;   // 0-100
-  cleanliness: number; // 0-100
-  energy: number;      // 0-100
+  hunger: number;
+  happiness: number;
+  cleanliness: number;
+  energy: number;
   status: 'idle' | 'eating' | 'playing' | 'sleeping' | 'bathing';
   personality: 'lazy' | 'playful' | 'hungry';
-  // accessory теперь хранится отдельно? Лучше добавить поле для аксессуара, если не используется skinId.
-  // Используем accessory как строку.
+  // Аксессуары по слотам
+  hat?: string;
+  glasses?: string;
+  collar?: string;
+  scarf?: string;
+  boots?: string;
+  wings?: string;
+  // Для обратной совместимости
   accessory?: string;
-  // Дополнительно можно хранить время последнего взаимодействия
   lastInteraction?: number;
 }
 
@@ -24,13 +28,13 @@ export interface Skin {
   id: string;
   name: string;
   description: string;
-  breed: string;       // для какой породы
+  breed: string;
   color: string;
   patternColor: string;
   eyeColor: string;
   cost: number;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
-  accessory?: string;  // если это аксессуар, содержит его идентификатор
+  accessory?: string; // идентификатор аксессуара
 }
 
 export interface DailyQuest {
@@ -82,8 +86,8 @@ export interface PlayerProfile {
   paws: number;
   cats: Cat[];
   activeCatId: string;
-  unlockedSkins: string[]; // массив id скинов
-  unlockedBreeds?: string[]; // массив разблокированных пород
+  unlockedSkins: string[];
+  unlockedBreeds?: string[];
   quests: DailyQuest[];
   unlockedAchievements?: string[];
   totalPlayTime: number;
@@ -99,14 +103,13 @@ export interface PlayerProfile {
   claimedReviewReward: boolean;
   isAdmin?: boolean;
   blocked?: boolean;
-  claimedStreakMilestones?: string[]; // Награды за серии дней
-  careCalendarHistory?: string[]; // Даты входов для календаря
-  lastActiveDay?: string; // Последний активный день
-  createdAt?: string; // Дата регистрации
-  avatar?: string; // Аватар игрока
-  redeemedPromos?: string[]; // Погашенные промокоды
-  lastPromoRedeemedTime?: number; // Время последнего промокода
-  // Новые поля для инвентаря
+  claimedStreakMilestones?: string[];
+  careCalendarHistory?: string[];
+  lastActiveDay?: string;
+  createdAt?: string;
+  avatar?: string;
+  redeemedPromos?: string[];
+  lastPromoRedeemedTime?: number;
   foodCount: number;
   soapCount: number;
   fishCount?: number;

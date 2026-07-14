@@ -1,13 +1,14 @@
-// src/components/SwiftUIWidgets.tsx (ПОЛНАЯ ВЕРСИЯ)
-import React from 'react';
+// src/components/SwiftUIWidgets.tsx
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Cat as CatType, PlayerProfile } from '../types';
+import { Cat as CatType, PlayerProfile, Skin } from '../types';
 import { Cat as CatIcon, Sparkles, Activity, Target, Flame, Heart, Droplets, Bed } from 'lucide-react';
 import { NeedsCatRenderer } from './NeedsCatRenderer';
 
 interface SwiftUIWidgetsProps {
   profile: PlayerProfile | null;
   activeCat: CatType | undefined;
+  allSkins: Skin[];
   onInteract: (action: 'feed' | 'play' | 'clean' | 'sleep') => void;
   onOpenWindow: (windowId: string) => void;
 }
@@ -15,30 +16,58 @@ interface SwiftUIWidgetsProps {
 export const SwiftUIWidgets: React.FC<SwiftUIWidgetsProps> = ({
   profile,
   activeCat,
+  allSkins,
   onInteract,
   onOpenWindow,
 }) => {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      const diff = tomorrow.getTime() - now.getTime();
+      if (diff <= 0) {
+        setTimeLeft('Обновление скоро');
+        return;
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const skinColors = useMemo(() => {
+    if (!activeCat) return { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
+    const skin = allSkins.find(s => s.id === activeCat.skinId);
+    if (skin) {
+      return { color: skin.color, patternColor: skin.patternColor, eyeColor: skin.eyeColor };
+    }
+    if (activeCat.breed === 'Siamese') return { color: '#fef3c7', patternColor: '#78350f', eyeColor: '#06b6d4' };
+    if (activeCat.breed === 'British Shorthair') return { color: '#64748b', patternColor: '#475569', eyeColor: '#f59e0b' };
+    if (activeCat.breed === 'Sphynx') return { color: '#fda4af', patternColor: '#f43f5e', eyeColor: '#10b981' };
+    if (activeCat.breed === 'Persian') return { color: '#fef08a', patternColor: '#eab308', eyeColor: '#a855f7' };
+    if (activeCat.breed === 'Bombay') return { color: '#1e293b', patternColor: '#0f172a', eyeColor: '#f59e0b' };
+    if (activeCat.breed === 'Bengal') return { color: '#f59e0b', patternColor: '#78350f', eyeColor: '#10b981' };
+    if (activeCat.breed === 'Sakura Neko') return { color: '#fff1f2', patternColor: '#fda4af', eyeColor: '#ec4899' };
+    if (activeCat.breed === 'Galaxy Cat') return { color: '#312e81', patternColor: '#6366f1', eyeColor: '#a855f7' };
+    return { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
+  }, [activeCat, allSkins]);
+
   if (!profile || !activeCat) return null;
 
   const completedQuests = profile.quests.filter((q) => q.completed).length;
   const totalQuests = profile.quests.length;
 
-  // Active cat custom skin fallback
-  const catSkin = activeCat.skinColor ? {
-    color: activeCat.skinColor,
-    patternColor: activeCat.patternColor || '#ff85a1',
-    eyeColor: activeCat.eyeColor || '#0ea5e9'
-  } : {
-    color: '#ffccd5',
-    patternColor: '#ff85a1',
-    eyeColor: '#0ea5e9'
-  };
-
   return (
-    // Используем flex-col и центрируем, чтобы виджеты не растягивались на всю ширину на телефонах
     <div className="absolute top-16 left-4 right-4 bottom-28 pointer-events-none z-10 flex flex-col items-center gap-3 select-none">
       
-      {/* 1. Виджет Котика */}
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -46,9 +75,7 @@ export const SwiftUIWidgets: React.FC<SwiftUIWidgetsProps> = ({
         onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; onOpenWindow('cats'); }}
         className="pointer-events-auto w-full max-w-[400px] h-[160px] rounded-[20px] glass-panel border border-white/30 dark:border-white/10 p-3 shadow-xl flex flex-row gap-3 items-stretch hover:shadow-2xl hover:scale-[1.01] cursor-pointer transition-all group"
       >
-        {/* Левая колонка: информация и кнопки */}
         <div className="flex-1 flex flex-col justify-between">
-          {/* Верхняя строка: Имя, уровень, лапки */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <CatIcon size={14} className="text-slate-700 dark:text-slate-300" />
@@ -64,7 +91,6 @@ export const SwiftUIWidgets: React.FC<SwiftUIWidgetsProps> = ({
             </div>
           </div>
 
-          {/* 4 Индикатора (Сытость, Радость, Гигиена, Энергия) */}
           <div className="grid grid-cols-4 gap-1 my-1">
             <div className="flex flex-col items-center bg-white/30 dark:bg-black/15 p-1 rounded-lg border border-white/20 dark:border-white/5">
               <Flame size={8} className={activeCat.hunger < 35 ? 'text-rose-500 animate-pulse' : 'text-orange-500'} />
@@ -88,7 +114,6 @@ export const SwiftUIWidgets: React.FC<SwiftUIWidgetsProps> = ({
             </div>
           </div>
 
-          {/* 4 Кнопки действий (Кормить, Играть, Мыть, Уложить) */}
           <div className="grid grid-cols-4 gap-1">
             <button onClick={() => onInteract('feed')} disabled={activeCat.status === 'sleeping'} className="py-1 px-0.5 text-[8px] font-bold rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-center">Кормить</button>
             <button onClick={() => onInteract('play')} disabled={activeCat.status === 'sleeping'} className="py-1 px-0.5 text-[8px] font-bold rounded-lg bg-rose-500 text-white hover:bg-rose-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-center">Играть</button>
@@ -97,7 +122,6 @@ export const SwiftUIWidgets: React.FC<SwiftUIWidgetsProps> = ({
           </div>
         </div>
 
-        {/* Правая колонка: Интерактивный котик */}
         <div className="w-[85px] bg-black/5 dark:bg-black/25 rounded-xl border border-white/15 dark:border-white/5 flex items-center justify-center relative overflow-hidden shrink-0">
           <NeedsCatRenderer
             status={activeCat.status}
@@ -106,16 +130,21 @@ export const SwiftUIWidgets: React.FC<SwiftUIWidgetsProps> = ({
             cleanliness={activeCat.cleanliness}
             energy={activeCat.energy}
             breed={activeCat.breed}
-            color={catSkin.color}
-            patternColor={catSkin.patternColor}
-            eyeColor={catSkin.eyeColor}
-            accessory={(activeCat as any).accessory}
+            color={skinColors.color}
+            patternColor={skinColors.patternColor}
+            eyeColor={skinColors.eyeColor}
+            hat={activeCat.hat}
+            glasses={activeCat.glasses}
+            collar={activeCat.collar}
+            scarf={activeCat.scarf}
+            boots={activeCat.boots}
+            wings={activeCat.wings}
+            accessory={activeCat.accessory}
             size={72}
           />
         </div>
       </motion.div>
 
-      {/* 2. Виджет Квестов */}
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -125,7 +154,12 @@ export const SwiftUIWidgets: React.FC<SwiftUIWidgetsProps> = ({
       >
         <div className="flex items-center justify-between">
           <span className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20"><Target size={14} className="group-hover:rotate-12 transition-transform" /></span>
-          <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">{completedQuests}/{totalQuests}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">{completedQuests}/{totalQuests}</span>
+            <span className="text-[9px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded-full border border-sky-400/20">
+              ⏱️ {timeLeft}
+            </span>
+          </div>
         </div>
         <div>
           <h3 className="text-[13px] font-bold text-slate-800 dark:text-slate-100 mt-1 leading-tight">Квесты дня</h3>
@@ -139,7 +173,6 @@ export const SwiftUIWidgets: React.FC<SwiftUIWidgetsProps> = ({
         </div>
       </motion.div>
 
-      {/* 3. Виджет Аналитики */}
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}

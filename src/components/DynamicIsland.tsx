@@ -112,13 +112,13 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
           </motion.div>
         ) : (
           <motion.div
-            initial={{ width: '100px', height: '22px', borderRadius: '999px', opacity: 0.8 }}
-            animate={{ width: '100px', height: '22px', borderRadius: '999px', opacity: 1 }}
-            className="pointer-events-auto bg-black text-white/95 shadow-2xl flex items-center justify-center gap-1.5 border border-white/10 px-2 py-0.5 font-mono text-[8px] font-extrabold tracking-wider mt-1"
+            initial={{ width: '115px', height: '28px', borderRadius: '999px', opacity: 0.8 }}
+            animate={{ width: '115px', height: '28px', borderRadius: '999px', opacity: 1 }}
+            className="pointer-events-auto bg-black text-white shadow-2xl flex items-center justify-center gap-2 border border-white/10 px-3 py-1 font-sans text-xs font-bold tracking-tight mt-1 hover:scale-102 transition-transform"
           >
-            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="text-white/30 font-sans tracking-normal">|</span>
-            <span className="text-sky-300 font-bold">{timeStr}</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="text-white/25 font-light">|</span>
+            <span className="text-white font-semibold tracking-wide font-mono text-[11px]">{timeStr}</span>
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+// src/App.tsx
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { useGameState } from './hooks/useGameState';
 import { FirebaseLogger } from './utils/FirebaseLogger';
@@ -11,42 +12,22 @@ import { QuestsWindow } from './components/QuestsWindow';
 import { AnalyticsWindow } from './components/AnalyticsWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import { AntistressWindow } from './components/AntistressWindow';
-import { CalendarWindow } from './components/CalendarWindow';
+import { CarePackPopover } from './components/CarePackPopover';
 import { Onboarding } from './components/Onboarding';
 import { Dock } from './components/Dock';
 import { DesktopBackground } from './components/DesktopBackground';
 import { Screensaver } from './components/Screensaver';
 import { DesktopContextMenu } from './components/DesktopContextMenu';
 import { AdminPanel } from './components/AdminPanel';
-import { playWindowOpenSound, playWindowCloseSound, playMacClickSound, setSoundsMuted, triggerHaptic } from './utils/audio';
-import { useZIndex } from './context/ZIndexContext';
+import { AdminDashboardModal } from './components/AdminDashboardModal';
+import { playWindowOpenSound, playWindowCloseSound, setSoundsMuted, triggerHaptic } from './utils/audio';
+import { useWindowManager, WindowId } from './context/WindowManagerContext';
+import { initAuth } from './firebase';
 import { db } from './firebase';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { PlayerProfile, Skin } from './types';
 
-const USERS_COLLECTION = 'users';
-
-// Получить всех пользователей из Firebase
-const getUsersFromFirestore = async () => {
-  try {
-    const snapshot = await getDocs(collection(db, USERS_COLLECTION));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (e) {
-    console.error('❌ Ошибка получения пользователей из Firebase:', e);
-    return [];
-  }
-};
-
-// Обновить пользователя (для админки)
-const updateUserInFirestore = async (userId: string, data: any) => {
-  const userRef = doc(db, USERS_COLLECTION, userId);
-  await updateDoc(userRef, data);
-};
-
-// Удалить пользователя
-const deleteUserFromFirestore = async (userId: string) => {
-  const userRef = doc(db, USERS_COLLECTION, userId);
-  await deleteDoc(userRef);
-};
+const ADMIN_PASSWORD = '1111'; // В реальном проекте должно быть в .env
 
 export default function App() {
   const {
@@ -64,7 +45,7 @@ export default function App() {
     setShowConflictModal,
     conflictCloudData,
     conflictLocalData,
-    resolveConflict,
+    resolveConflict, // теперь это определено
     redeemPromoCode,
     createProfile,
     interactWithCat,
@@ -87,154 +68,106 @@ export default function App() {
     addDiaryEntry,
   } = useGameState();
 
-  const { focusWindow } = useZIndex();
+  const {
+    openWindows,
+    minimizedWindows,
+    activeWindow,
+    openWindow,
+    closeWindow,
+    minimizeWindow,
+    toggleWindow,
+  } = useWindowManager();
 
-  const [activeWindow, setActiveWindow] = useState<string | null>('cats');
-  const [openWindows, setOpenWindows] = useState<string[]>(['cats']);
-  const [minimizedWindows, setMinimizedWindows] = useState<string[]>([]);
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
-  const [showAdoptionForm, setShowAdoptionForm] = useState(false);
-  const [adoptionName, setAdoptionName] = useState('');
-  const [adoptionBreedIdx, setAdoptionBreedIdx] = useState(0);
   const [showScreensaver, setShowScreensaver] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [weatherOverride, setWeatherOverride] = useState<'rain' | 'snow' | 'morning' | 'night' | 'none' | null>(null);
-  const [prevActiveWindow, setPrevActiveWindow] = useState<string | null>('cats');
 
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
   const [clickCount, setClickCount] = useState(0);
-  const [clickTimer, setClickTimer] = useState<any>(null);
+  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
+
+  const [careCategory, setCareCategory] = useState<'food' | 'toy' | 'soap' | null>(null);
+  const [questsInitialTab, setQuestsInitialTab] = useState<'quests' | 'calendar'>('quests');
+
+  const handleOpenWindow = useCallback((id: WindowId) => {
+    if (id === 'calendar') {
+      setQuestsInitialTab('calendar');
+      openWindow('quests');
+    } else {
+      if (id === 'quests') {
+        setQuestsInitialTab('quests');
+      }
+      openWindow(id);
+    }
+  }, [openWindow]);
+
+  const handleToggleWindow = useCallback((id: WindowId) => {
+    if (id === 'calendar') {
+      setQuestsInitialTab('calendar');
+      toggleWindow('quests');
+    } else {
+      if (id === 'quests') {
+        setQuestsInitialTab('quests');
+      }
+      toggleWindow(id);
+    }
+  }, [toggleWindow]);
+
+  const handleInteractionClick = useCallback((action: string) => {
+    if (action === 'feed') {
+      setCareCategory('food');
+    } else if (action === 'play') {
+      setCareCategory('toy');
+    } else if (action === 'clean') {
+      setCareCategory('soap');
+    } else {
+      interactWithCat(action);
+    }
+  }, [interactWithCat]);
 
   const [usersList, setUsersList] = useState<any[]>([]);
-  const touchTimerRef = useRef<any>(null);
-  const syncIntervalRef = useRef<any>(null);
+  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string>('Никогда');
-  const [offlineProfile, setOfflineProfile] = useState<any>(null);
-
-  // Загружаем профиль из localStorage
+  // Аутентификация при старте
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('maccat_profile');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setOfflineProfile(parsed);
+    initAuth().then((uid) => {
+      if (uid) {
+        FirebaseLogger.log('info', `App: пользователь авторизован ${uid}`);
+      } else {
+        FirebaseLogger.log('warn', 'App: аутентификация не удалась, продолжаем в офлайн-режиме');
       }
-    } catch (e) {}
+    });
   }, []);
 
-  // Загрузка пользователей из Firebase (для админки)
+  // Загрузка пользователей для админки
   const fetchUsersList = useCallback(async () => {
-    const users = await getUsersFromFirestore();
-    setUsersList(users);
+    try {
+      const snapshot = await getDocs(collection(db, 'users'));
+      setUsersList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e) {
+      console.error('Ошибка загрузки пользователей:', e);
+    }
   }, []);
 
-  // Ручная синхронизация (из меню или настроек)
-  const handleManualSync = useCallback(async () => {
-    FirebaseLogger.log('info', 'Ручная синхронизация запущена из меню настроек App.tsx');
-    await originalTriggerCloudSync();
-    if (isAdminMode) {
-      await fetchUsersList();
-    }
-  }, [originalTriggerCloudSync, isAdminMode, fetchUsersList]);
-
-  // При входе в админ-режим загружаем список
-  useEffect(() => {
-    if (isAdminMode) {
-      fetchUsersList();
-    }
-  }, [isAdminMode, fetchUsersList]);
-
-  // Автосохранение в локальный кэш каждую минуту
+  // Автосинхронизация каждые 2 минуты
   useEffect(() => {
     if (!profile) return;
-    if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
-    syncIntervalRef.current = setInterval(async () => {
-      localStorage.setItem('maccat_profile', JSON.stringify(profile));
-    }, 60000);
+    syncIntervalRef.current = setInterval(() => {
+      if (isOnline && !isOfflineMode && !showConflictModal) {
+        originalTriggerCloudSync();
+      }
+    }, 120000);
     return () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
-  }, [profile]);
+  }, [profile, isOnline, isOfflineMode, showConflictModal, originalTriggerCloudSync]);
 
-  // ОДНОКРАТНАЯ ПЕРВИЧНАЯ СИНХРОНИЗАЦИЯ (запускается один раз при загрузке)
-  const initialSyncDone = useRef(false);
+  // Тема оформления
   useEffect(() => {
-    if (!profile) return;
-    if (initialSyncDone.current) return;
-    initialSyncDone.current = true;
-    FirebaseLogger.log('info', 'Запуск первичной синхронизации при входе в игру...');
-    setTimeout(() => {
-      originalTriggerCloudSync();
-    }, 1000);
-  }, [profile, originalTriggerCloudSync]);
-
-  // Звуки, тема и остальные хуки (без изменений)
-  useEffect(() => {
-    if (profile) {
-      setSoundsMuted(!profile.soundEnabled);
-    }
-  }, [profile?.soundEnabled]);
-
-  useEffect(() => {
-    if (activeWindow !== prevActiveWindow) {
-      if (activeWindow) {
-        playWindowOpenSound();
-      } else {
-        playWindowCloseSound();
-      }
-      setPrevActiveWindow(activeWindow);
-    }
-  }, [activeWindow, prevActiveWindow]);
-
-  useEffect(() => {
-    let inactivityTimer: any;
-    const resetTimer = () => {
-      if (showScreensaver) return;
-      clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(() => {
-        setShowScreensaver(true);
-      }, 90000);
-    };
-    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
-    events.forEach((event) => {
-      window.addEventListener(event, resetTimer, { passive: true });
-    });
-    resetTimer();
-    return () => {
-      clearTimeout(inactivityTimer);
-      events.forEach((event) => {
-        window.removeEventListener(event, resetTimer);
-      });
-    };
-  }, [showScreensaver]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const target = e.target as HTMLElement;
-    const isInsideWindow = target.closest('.mac-window-frame') || target.closest('.glass-panel-dark') || target.closest('button') || target.closest('input');
-    if (isInsideWindow) return;
-    const touch = e.touches[0];
-    touchTimerRef.current = setTimeout(() => {
-      triggerHaptic(30);
-      setContextMenu({ x: touch.clientX, y: touch.clientY });
-    }, 700);
-  };
-  const handleTouchEnd = () => {
-    clearTimeout(touchTimerRef.current);
-  };
-
-  const ADOPTION_BREEDS = [
-    { id: 'Scottish Fold', name: 'Скоттиш Фраппе (Scottish Fold)', skin: 'scottish_pink' },
-    { id: 'British Shorthair', name: 'Британский Плюш (British Shorthair)', skin: 'british_blue' },
-    { id: 'Siamese', name: 'Королевский Сиам (Siamese)', skin: 'siamese_point' },
-    { id: 'Persian', name: 'Облачный Перс (Persian)', skin: 'persian_gold' },
-    { id: 'Sphynx', name: 'Лунный Сфинкс (Sphynx)', skin: 'sphynx_naked' },
-  ];
-
-  useLayoutEffect(() => {
     if (!profile) return;
     const updateTheme = () => {
       if (profile.theme === 'auto') {
@@ -255,7 +188,7 @@ export default function App() {
     }
   }, [profile?.theme]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const root = document.documentElement;
     if (resolvedTheme === 'dark') {
       root.classList.add('dark');
@@ -264,8 +197,83 @@ export default function App() {
     }
   }, [resolvedTheme]);
 
-  const activeCat = profile?.cats?.find((c) => c.id === profile.activeCatId);
-  
+  // Звуки
+  useEffect(() => {
+    if (profile) {
+      setSoundsMuted(!profile.soundEnabled);
+    }
+  }, [profile?.soundEnabled]);
+
+  // Скринсейвер
+  useEffect(() => {
+    let inactivityTimer: NodeJS.Timeout;
+    const resetTimer = () => {
+      if (showScreensaver) return;
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => setShowScreensaver(true), 90000);
+    };
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    events.forEach(event => window.addEventListener(event, resetTimer, { passive: true }));
+    resetTimer();
+    return () => {
+      clearTimeout(inactivityTimer);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, [showScreensaver]);
+
+  // Админ-функции
+  const handleAdminLogin = () => {
+    setShowAdminPrompt(true);
+  };
+
+  const handleAdminPassword = (password: string) => {
+    if (password === ADMIN_PASSWORD) {
+      setIsAdminMode(true);
+      setShowAdminPrompt(false);
+      triggerHaptic(30);
+      fetchUsersList();
+    } else {
+      triggerHaptic(50);
+      alert('Неверный пароль');
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminMode(false);
+    setUsersList([]);
+  };
+
+  // Обработчики контекстного меню и жестов
+  const handleContextMenu = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const isInsideWindow = target.closest('.mac-window-frame') || target.closest('.glass-panel-dark') || target.closest('button') || target.closest('input');
+    if (!isInsideWindow) {
+      e.preventDefault();
+      setContextMenu({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    const isInsideWindow = target.closest('.mac-window-frame') || target.closest('.glass-panel-dark') || target.closest('button') || target.closest('input');
+    if (isInsideWindow) return;
+    const touch = e.touches[0];
+    touchTimerRef.current = setTimeout(() => {
+      triggerHaptic(30);
+      setContextMenu({ x: touch.clientX, y: touch.clientY });
+    }, 700);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+  };
+
+  const activeCat = profile?.cats?.find(c => c.id === profile.activeCatId);
+
+  // Получение цветов скина
   const getSkinColors = useCallback((skinId: string) => {
     const skin = allSkins.find(s => s.id === skinId);
     if (skin) {
@@ -276,164 +284,33 @@ export default function App() {
 
   const activeSkinColors = activeCat ? getSkinColors(activeCat.skinId) : null;
 
-  // Админ-функции
-  const handleBlockUser = async (userId: string) => {
-    try {
-      await updateUserInFirestore(userId, { blocked: true });
+  // Обработчик ручной синхронизации (из меню или настроек)
+  const handleManualSync = useCallback(async () => {
+    FirebaseLogger.log('info', 'Ручная синхронизация запущена из меню настроек App.tsx');
+    await originalTriggerCloudSync();
+    if (isAdminMode) {
       await fetchUsersList();
-    } catch (e) { console.error(e); }
-  };
-
-  const handleUnblockUser = async (userId: string) => {
-    try {
-      await updateUserInFirestore(userId, { blocked: false });
-      await fetchUsersList();
-    } catch (e) { console.error(e); }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (window.confirm('Удалить пользователя и все его данные?')) {
-      try {
-        await deleteUserFromFirestore(userId);
-        await fetchUsersList();
-      } catch (e) { console.error(e); }
     }
-  };
+  }, [originalTriggerCloudSync, isAdminMode, fetchUsersList]);
 
-  const handleMakeAdmin = async (userId: string) => {
-    try {
-      await updateUserInFirestore(userId, { isAdmin: true });
-      await fetchUsersList();
-    } catch (e) { console.error(e); }
-  };
-
-  const handleChangeBalance = async (userId: string, amount: number) => {
-    try {
-      const userRef = doc(db, USERS_COLLECTION, userId);
-      await updateDoc(userRef, { paws: amount });
-      await fetchUsersList();
-    } catch (e) { console.error(e); }
-  };
-
-  const handleCreatorClick = () => {
-    setClickCount(prev => prev + 1);
-    if (clickTimer) clearTimeout(clickTimer);
-    setClickTimer(setTimeout(() => {
-      setClickCount(0);
-    }, 2000));
-    if (clickCount >= 2) {
-      setClickCount(0);
-      setShowAdminPrompt(true);
-      if (clickTimer) clearTimeout(clickTimer);
-    }
-  };
-
-  const handleAdminLogin = () => {
-    if (adminPassword === '1111') {
-      setIsAdminMode(true);
-      setShowAdminPrompt(false);
-      setAdminPassword('');
-      triggerHaptic(30);
-      fetchUsersList();
-    } else {
-      triggerHaptic(50);
-      setAdminPassword('');
-      alert('Неверный пароль');
-    }
-  };
-
-  const handleAdminLogout = () => {
-    setIsAdminMode(false);
-    setUsersList([]);
-  };
-
-  const handleOpenWindow = (windowId: string, fromWidget = false) => {
-    setShowAdoptionForm(false);
-    setOpenWindows((prev) => {
-      if (!prev.includes(windowId)) {
-        return [...prev, windowId];
+  // Обработчик закрытия окна (для beforeunload)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (profile) {
+        localStorage.setItem('maccat_profile', JSON.stringify(profile));
       }
-      return prev;
-    });
-    focusWindow(windowId);
-    if (minimizedWindows.includes(windowId)) {
-      setMinimizedWindows((prev) => prev.filter((id) => id !== windowId));
-      setActiveWindow(windowId);
-      return;
-    }
-    if (activeWindow === windowId) {
-      if (fromWidget) {
-        setActiveWindow(windowId);
-      } else {
-        handleMinimizeWindow(windowId);
-      }
-    } else {
-      setActiveWindow(windowId);
-    }
-  };
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [profile]);
 
-  const handleMinimizeWindow = (windowId: string) => {
-    const nextMinimized = minimizedWindows.includes(windowId)
-      ? minimizedWindows
-      : [...minimizedWindows, windowId];
-    setMinimizedWindows(nextMinimized);
-    const remaining = openWindows.filter((id) => id !== windowId && !nextMinimized.includes(id));
-    if (remaining.length > 0) {
-      const nextActive = remaining[remaining.length - 1];
-      setActiveWindow(nextActive);
-      focusWindow(nextActive);
-    } else {
-      setActiveWindow(null);
-    }
-  };
-
-  const handleCloseWindow = (windowId: string) => {
-    const nextOpen = openWindows.filter((id) => id !== windowId);
-    setOpenWindows(nextOpen);
-    setMinimizedWindows((prev) => prev.filter((id) => id !== windowId));
-    if (activeWindow === windowId) {
-      const remaining = nextOpen.filter((id) => !minimizedWindows.includes(id));
-      if (remaining.length > 0) {
-        const nextActive = remaining[remaining.length - 1];
-        setActiveWindow(nextActive);
-        focusWindow(nextActive);
-      } else {
-        setActiveWindow(null);
-      }
-    }
-  };
-
-  const handleAdoptSubmit = () => {
-    if (adoptionName.trim().length >= 2 && profile) {
-      const b = ADOPTION_BREEDS[adoptionBreedIdx];
-      adoptNewCat(adoptionName.trim(), b.id, b.skin);
-      setAdoptionName('');
-      setShowAdoptionForm(false);
-    }
-  };
-
-  const displayProfile = profile || offlineProfile;
-  if (!displayProfile) {
+  if (!profile) {
     return <Onboarding onCreateProfile={createProfile} />;
   }
 
-  const syncProps = {
-    syncing: syncingState,
-    onSync: handleManualSync,
-    lastSyncedTime: lastSyncedTime,
-  };
-
   return (
     <div
-      onContextMenu={(e) => {
-        const target = e.target as HTMLElement;
-        const isInsideWindow = target.closest('.mac-window-frame') || target.closest('.glass-panel-dark') || target.closest('button') || target.closest('input');
-        if (!isInsideWindow) {
-          e.preventDefault();
-          setContextMenu({ x: e.clientX, y: e.clientY });
-          playMacClickSound();
-        }
-      }}
+      onContextMenu={handleContextMenu}
       onClick={() => setContextMenu(null)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -441,10 +318,7 @@ export default function App() {
         resolvedTheme === 'dark' ? 'bg-slate-950' : 'bg-slate-100'
       }`}
     >
-      <DesktopBackground
-        wallpaperId={displayProfile?.currentWallpaper || 'ventura'}
-        weatherOverride={weatherOverride}
-      />
+      <DesktopBackground wallpaperId={profile.currentWallpaper} weatherOverride={weatherOverride} />
 
       <AnimatePresence>
         {contextMenu && (
@@ -452,136 +326,78 @@ export default function App() {
             x={contextMenu.x}
             y={contextMenu.y}
             onClose={() => setContextMenu(null)}
-            onUpdateWallpaper={(id) => updateWallpaper(id)}
+            onUpdateWallpaper={updateWallpaper}
             onUpdateWeather={(w) => setWeatherOverride(w)}
             activeWeather={weatherOverride}
-            activeWallpaper={displayProfile?.currentWallpaper || 'ventura'}
-            onOpenApp={(id) => handleOpenWindow(id, true)}
+            activeWallpaper={profile.currentWallpaper}
+            onOpenApp={(id) => handleOpenWindow(id as WindowId)}
           />
         )}
       </AnimatePresence>
 
       <MenuBar
-        profile={displayProfile}
+        profile={profile}
         isOnline={isOnline}
-        syncing={syncProps.syncing}
-        onSync={syncProps.onSync}
+        syncing={syncingState}
+        onSync={handleManualSync}
         onOpenSettings={() => handleOpenWindow('settings')}
         onOpenAbout={() => handleOpenWindow('analytics')}
-        onCreatorClick={handleCreatorClick}
+        onCreatorClick={() => {
+          setClickCount(prev => prev + 1);
+          if (clickTimer) clearTimeout(clickTimer);
+          setClickTimer(setTimeout(() => {
+            setClickCount(0);
+          }, 2000));
+          if (clickCount >= 2) {
+            setClickCount(0);
+            handleAdminLogin();
+            if (clickTimer) clearTimeout(clickTimer);
+          }
+        }}
+        onStreakClick={() => {
+          triggerHaptic();
+          setShowAdminDashboard(true);
+        }}
         isAdminMode={isAdminMode}
       >
         <DynamicIsland notifications={notifications} onDismiss={removeNotification} />
       </MenuBar>
 
       <SwiftUIWidgets
-        profile={displayProfile}
+        profile={profile}
         activeCat={activeCat}
-        onInteract={interactWithCat}
-        onOpenWindow={(id) => handleOpenWindow(id, true)}
+        onInteract={handleInteractionClick}
+        onOpenWindow={(id) => handleOpenWindow(id as WindowId)}
       />
 
       <div className="absolute top-0 left-0 w-full h-full pt-9 pb-20 z-20 pointer-events-none">
         <div className="w-full h-full relative pointer-events-none">
           <AnimatePresence>
-            {openWindows.includes('cats') && !showAdoptionForm && !minimizedWindows.includes('cats') && (
+            {openWindows.includes('cats') && !minimizedWindows.includes('cats') && (
               <CatWindow
                 key="cats"
-                profile={displayProfile}
+                profile={profile}
                 activeCat={activeCat}
-                onInteract={interactWithCat}
+                onInteract={handleInteractionClick}
                 onSelectCat={selectActiveCat}
-                onClose={() => handleCloseWindow('cats')}
-                onMinimize={() => handleMinimizeWindow('cats')}
-                onAdoptClick={() => setShowAdoptionForm(true)}
+                onClose={() => closeWindow('cats')}
+                onMinimize={() => minimizeWindow('cats')}
+                onAdoptClick={() => handleOpenWindow('cats')} // пока нет отдельного окна, оставляем
                 onPetClick={petCatClick}
               />
-            )}
-
-            {openWindows.includes('cats') && showAdoptionForm && !minimizedWindows.includes('cats') && (
-              <div
-                key="adopt"
-                className="absolute top-10 bottom-24 left-2 right-2 md:left-24 md:right-24 glass-panel-dark text-slate-100 rounded-3xl overflow-hidden shadow-2xl flex flex-col z-30 border border-white/10 pointer-events-auto"
-              >
-                <div className="h-12 bg-black/40 border-b border-white/5 px-4 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setShowAdoptionForm(false)}
-                      className="w-3.5 h-3.5 rounded-full bg-mac-red hover:brightness-90 flex items-center justify-center group"
-                    >
-                      <span className="text-[8px] text-red-950 font-black opacity-0 group-hover:opacity-100">×</span>
-                    </button>
-                    <span className="text-xs font-semibold text-slate-400 ml-3">Форма Adoption</span>
-                  </div>
-                  <div className="text-xs font-bold text-slate-200">Регистрация в реестре</div>
-                  <div className="w-16"></div>
-                </div>
-                <div className="flex-1 p-6 overflow-y-auto space-y-6 flex flex-col justify-center items-center max-w-md mx-auto">
-                  <div className="text-center space-y-1.5">
-                    <h2 className="text-lg font-bold text-white">Приютите пушистого питомца</h2>
-                    <p className="text-xs text-slate-400">Стоимость усыновления: <span className="font-bold text-sky-400">🐾 200 лапок</span>. У вас есть: <span className="font-bold text-sky-400">🐾 {displayProfile.paws} лапок</span></p>
-                  </div>
-                  <div className="w-full space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wide">Кличка котенка</label>
-                      <input
-                        type="text"
-                        value={adoptionName}
-                        onChange={(e) => setAdoptionName(e.target.value)}
-                        maxLength={14}
-                        placeholder="Введите кличку"
-                        className="w-full px-3.5 py-2 rounded-xl bg-black/35 border border-white/10 text-white font-bold text-xs focus:outline-none focus:border-sky-500 transition-all font-sans"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wide">Выберите породу</label>
-                      <div className="grid grid-cols-2 gap-1.5 max-h-[110px] overflow-y-auto pr-1">
-                        {ADOPTION_BREEDS.map((breed, idx) => (
-                          <button
-                            key={breed.id}
-                            onClick={() => setAdoptionBreedIdx(idx)}
-                            className={`p-2 rounded-lg text-[10px] font-bold text-left border cursor-pointer transition-all ${
-                              idx === adoptionBreedIdx
-                                ? 'bg-sky-500/20 border-sky-500 text-sky-300'
-                                : 'bg-white/5 border-transparent text-slate-300 hover:bg-white/10'
-                            }`}
-                          >
-                            {breed.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-3 w-full pt-2">
-                    <button
-                      onClick={() => setShowAdoptionForm(false)}
-                      className="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-xs hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      onClick={handleAdoptSubmit}
-                      disabled={adoptionName.trim().length < 2 || displayProfile.paws < 200}
-                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs active:scale-95 transition-all cursor-pointer"
-                    >
-                      Приютить (🐾 200)
-                    </button>
-                  </div>
-                </div>
-              </div>
             )}
 
             {openWindows.includes('shop') && !minimizedWindows.includes('shop') && (
               <ShopWindow
                 key="shop"
-                profile={displayProfile}
+                profile={profile}
                 activeCat={activeCat}
                 allSkins={allSkins}
                 onPurchase={purchaseSkinOrAccessory}
                 onApply={applySkinOrAccessory}
                 onDonatePaws={(amount) => addPaws(amount, true)}
-                onClose={() => handleCloseWindow('shop')}
-                onMinimize={() => handleMinimizeWindow('shop')}
+                onClose={() => closeWindow('shop')}
+                onMinimize={() => minimizeWindow('shop')}
                 onRedeemPromo={redeemPromoCode}
               />
             )}
@@ -589,30 +405,34 @@ export default function App() {
             {openWindows.includes('quests') && !minimizedWindows.includes('quests') && (
               <QuestsWindow
                 key="quests"
-                profile={displayProfile}
+                profile={profile}
+                activeCat={activeCat}
+                onInteract={handleInteractionClick}
                 onClaimReward={claimQuestReward}
-                onClose={() => handleCloseWindow('quests')}
-                onMinimize={() => handleMinimizeWindow('quests')}
+                onClaimMilestone={claimStreakMilestone}
+                onClose={() => closeWindow('quests')}
+                onMinimize={() => minimizeWindow('quests')}
+                initialTab={questsInitialTab}
               />
             )}
 
             {openWindows.includes('analytics') && !minimizedWindows.includes('analytics') && (
               <AnalyticsWindow
                 key="analytics"
-                profile={displayProfile}
+                profile={profile}
                 analytics={analytics}
                 usersList={usersList}
-                onClose={() => handleCloseWindow('analytics')}
-                onMinimize={() => handleMinimizeWindow('analytics')}
+                onClose={() => closeWindow('analytics')}
+                onMinimize={() => minimizeWindow('analytics')}
               />
             )}
 
             {openWindows.includes('settings') && !minimizedWindows.includes('settings') && (
               <SettingsWindow
                 key="settings"
-                profile={displayProfile}
-                syncing={syncProps.syncing}
-                onSync={syncProps.onSync}
+                profile={profile}
+                syncing={syncingState}
+                onSync={handleManualSync}
                 onUpdateNickname={updateNickname}
                 onUpdateTheme={updateThemePref}
                 onUpdateWallpaper={updateWallpaper}
@@ -620,35 +440,27 @@ export default function App() {
                 isOfflineMode={isOfflineMode}
                 setIsOfflineMode={setIsOfflineMode}
                 syncLog={syncLog}
-                lastSyncedTime={syncProps.lastSyncedTime}
+                lastSyncedTime={lastSyncedTime}
                 onRedeemPromo={redeemPromoCode}
-                onClose={() => handleCloseWindow('settings')}
-                onMinimize={() => handleMinimizeWindow('settings')}
+                onClose={() => closeWindow('settings')}
+                onMinimize={() => minimizeWindow('settings')}
               />
             )}
 
             {openWindows.includes('antistress') && !minimizedWindows.includes('antistress') && (
               <AntistressWindow
                 key="antistress"
-                profile={displayProfile}
+                profile={profile}
                 onPopBurst={burstPopIt}
                 onKeyboardClick={clickKeyboard}
-                onClose={() => handleCloseWindow('antistress')}
-                onMinimize={() => handleMinimizeWindow('antistress')}
+                onClose={() => closeWindow('antistress')}
+                onMinimize={() => minimizeWindow('antistress')}
                 onAddPaws={(amount) => addPaws(amount, false)}
                 onAddDiaryEntry={addDiaryEntry}
               />
             )}
 
-            {openWindows.includes('calendar') && !minimizedWindows.includes('calendar') && (
-              <CalendarWindow
-                key="calendar"
-                profile={displayProfile}
-                onClaimMilestone={claimStreakMilestone}
-                onClose={() => handleCloseWindow('calendar')}
-                onMinimize={() => handleMinimizeWindow('calendar')}
-              />
-            )}
+
           </AnimatePresence>
         </div>
       </div>
@@ -658,12 +470,12 @@ export default function App() {
           usersList={usersList}
           onClose={handleAdminLogout}
           onUpdateUsers={fetchUsersList}
-          currentUser={displayProfile}
-          onBlockUser={handleBlockUser}
-          onUnblockUser={handleUnblockUser}
-          onDeleteUser={handleDeleteUser}
-          onMakeAdmin={handleMakeAdmin}
-          onChangeBalance={handleChangeBalance}
+          currentUser={profile}
+          onBlockUser={async (uid) => { await updateDoc(doc(db, 'users', uid), { blocked: true }); fetchUsersList(); }}
+          onUnblockUser={async (uid) => { await updateDoc(doc(db, 'users', uid), { blocked: false }); fetchUsersList(); }}
+          onDeleteUser={async (uid) => { await deleteDoc(doc(db, 'users', uid)); fetchUsersList(); }}
+          onMakeAdmin={async (uid) => { await updateDoc(doc(db, 'users', uid), { isAdmin: true }); fetchUsersList(); }}
+          onChangeBalance={async (uid, amount) => { await updateDoc(doc(db, 'users', uid), { paws: amount }); fetchUsersList(); }}
         />
       )}
 
@@ -673,22 +485,23 @@ export default function App() {
             <h3 className="text-white font-bold text-sm mb-2">Введите пароль администратора</h3>
             <input
               type="password"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-white text-sm focus:outline-none focus:border-sky-500 mb-3"
               placeholder="Пароль"
               autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdminPassword((e.target as HTMLInputElement).value)}
             />
             <div className="flex gap-2">
               <button
-                onClick={() => { setShowAdminPrompt(false); setAdminPassword(''); }}
+                onClick={() => { setShowAdminPrompt(false); }}
                 className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm hover:bg-white/10 transition"
               >
                 Отмена
               </button>
               <button
-                onClick={handleAdminLogin}
+                onClick={() => {
+                  const input = document.querySelector('input[type="password"]') as HTMLInputElement;
+                  handleAdminPassword(input.value);
+                }}
                 className="flex-1 py-2 rounded-xl bg-sky-500 text-white text-sm font-bold hover:bg-sky-600 transition"
               >
                 Войти
@@ -697,6 +510,17 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <AdminDashboardModal
+        isOpen={showAdminDashboard}
+        onClose={() => setShowAdminDashboard(false)}
+        profile={profile}
+        isOnline={isOnline}
+        syncing={syncingState}
+        isAdminMode={isAdminMode}
+        onOpenAdminPanel={() => setIsAdminMode(true)}
+        onOpenLoginPrompt={() => setShowAdminPrompt(true)}
+      />
 
       {showConflictModal && conflictCloudData && conflictLocalData && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
@@ -736,12 +560,27 @@ export default function App() {
         </div>
       )}
 
-      <Dock activeWindow={activeWindow} minimizedWindows={minimizedWindows} onOpenWindow={handleOpenWindow} />
+      <Dock
+        activeWindow={activeWindow}
+        minimizedWindows={minimizedWindows}
+        onOpenWindow={(id) => handleToggleWindow(id as WindowId)}
+      />
+
+      <CarePackPopover
+        isOpen={careCategory !== null}
+        category={careCategory}
+        profile={profile}
+        activeCat={activeCat}
+        onClose={() => setCareCategory(null)}
+        onUseItem={interactWithCat}
+        onBuyItem={purchaseSkinOrAccessory}
+        onOpenShop={() => handleOpenWindow('shop')}
+      />
 
       <AnimatePresence>
         {showScreensaver && (
-          <Screensaver 
-            onDismiss={() => setShowScreensaver(false)} 
+          <Screensaver
+            onDismiss={() => setShowScreensaver(false)}
             activeCat={activeCat}
             activeSkin={activeSkinColors || undefined}
           />

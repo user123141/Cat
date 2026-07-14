@@ -1,3 +1,4 @@
+// src/components/Dock.tsx
 import React from 'react';
 import { motion } from 'motion/react';
 import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat, Calendar } from 'lucide-react';
@@ -25,7 +26,7 @@ export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOp
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.5 }}
-        className="pointer-events-auto flex items-end gap-2 md:gap-3.5 px-3 py-2 md:py-3.5 rounded-[24px] md:rounded-[26px] bg-white/25 dark:bg-black/25 backdrop-blur-xl border border-white/30 dark:border-white/15 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] relative max-w-full overflow-x-auto no-scrollbar scrollbar-none"
+        className="pointer-events-auto flex items-end gap-2 md:gap-3.5 px-2 md:px-3 py-2 md:py-3.5 rounded-[20px] md:rounded-[26px] bg-white/25 dark:bg-black/25 backdrop-blur-xl border border-white/30 dark:border-white/15 shadow-lg relative max-w-full overflow-x-auto no-scrollbar"
       >
         {dockItems.map((item) => {
           const isOpen = activeWindow === item.id;
@@ -33,7 +34,8 @@ export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOp
 
           return (
             <div key={item.id} className="relative group flex flex-col items-center">
-              <div className="absolute -top-10 scale-90 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 bg-neutral-900/95 dark:bg-neutral-800/95 text-white border border-white/10 text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-50">
+              {/* Всплывающая подсказка – только на десктопе */}
+              <div className="hidden sm:block absolute -top-10 scale-90 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 bg-neutral-900/95 dark:bg-neutral-800/95 text-white border border-white/10 text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-50">
                 {item.label}
               </div>
 
@@ -42,7 +44,7 @@ export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOp
                 whileTap={{ scale: 0.95 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                 onClick={() => onOpenWindow(item.id)}
-                className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all cursor-pointer relative shadow-md backdrop-blur-md ${
+                className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all cursor-pointer relative shadow-md backdrop-blur-md ${
                   isOpen
                     ? 'bg-white/55 dark:bg-black/55 border border-white/50 dark:border-white/20 shadow-lg'
                     : isMinimized
@@ -53,6 +55,7 @@ export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOp
                 {item.icon}
               </motion.button>
 
+              {/* Индикатор активности */}
               <div className="h-1.5 flex items-center justify-center mt-1">
                 <div
                   className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${

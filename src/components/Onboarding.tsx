@@ -176,7 +176,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onCreateProfile }) => {
                               : 'bg-white/5 border-transparent text-slate-300 hover:bg-white/10'
                           }`}
                         >
-                          {breed.id === 'Scottish Fold' ? '🐱 Скоттиш' : breed.id === 'British Shorthair' ? '🐱 Британец' : breed.id === 'Siamese' ? '🐱 Сиам' : breed.id === 'Persian' ? '🐱 Перс' : '🐱 Сфинкс'}
+                          {breed.id === 'Scottish Fold' ? 'Скоттиш' : breed.id === 'British Shorthair' ? 'Британец' : breed.id === 'Siamese' ? 'Сиам' : breed.id === 'Persian' ? 'Перс' : 'Сфинкс'}
                         </button>
                       );
                     })}

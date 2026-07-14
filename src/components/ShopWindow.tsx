@@ -1,8 +1,9 @@
+// src/components/ShopWindow.tsx
 import React, { useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Skin, Cat, PlayerProfile } from '../types';
 import { CatRenderer } from './CatRenderer';
-import { X, Sparkles, Check, ShoppingBag, CreditCard, ShieldCheck, Star, Sparkle, Percent, Receipt } from 'lucide-react';
+import { X, Sparkles, Check, ShoppingBag, CreditCard, ShieldCheck, Star, Sparkle, Percent, Receipt, Bone, Fish, Droplet, Droplets, Ghost } from 'lucide-react';
 import { triggerHaptic } from '../utils/audio';
 import { MacCatWindowFrame } from './MacCatWindowFrame';
 import { CONSUMABLE_ITEMS } from '../hooks/useGameState';
@@ -31,12 +32,39 @@ interface ShopWindowProps {
   onRedeemPromo?: (code: string) => { success: boolean; message: string };
 }
 
+const getConsumableIcon = (itemId: string, className: string = "w-8 h-8") => {
+  switch (itemId) {
+    case 'food_kibble':
+      return <Bone className={`${className} text-amber-500`} />;
+    case 'food_treat':
+      return <Sparkle className={`${className} text-pink-400`} />;
+    case 'food_tuna':
+      return <Fish className={`${className} text-sky-400`} />;
+    case 'food_steak':
+      return <Sparkles className={`${className} text-red-500`} />;
+    case 'soap_lavender':
+      return <Droplet className={`${className} text-purple-400`} />;
+    case 'soap_minerals':
+      return <Droplets className={`${className} text-cyan-400`} />;
+    case 'soap_charcoal':
+      return <Sparkles className={`${className} text-teal-400`} />;
+    case 'toy_wand':
+      return <Sparkle className={`${className} text-yellow-400`} />;
+    case 'toy_laser':
+      return <Sparkles className={`${className} text-red-400 animate-pulse`} />;
+    case 'toy_catnip':
+      return <Ghost className={`${className} text-emerald-400`} />;
+    default:
+      return <ShoppingBag className={`${className} text-slate-400`} />;
+  }
+};
+
 const DONATION_PACKS = [
-  { id: 'pack_100', paws: 100, priceUah: 49, desc: 'Начальный набор лапок для мелких покупок.', badge: 'Популярно', icon: '🪙' },
-  { id: 'pack_300', paws: 300, priceUah: 129, desc: 'Хороший старт. Хватит на пару крутых очков!', badge: 'Выгода 12%', icon: '🎒' },
-  { id: 'pack_500', paws: 500, priceUah: 199, desc: 'Золотой стандарт. Отличный баланс цены и объема.', badge: 'Рекомендовано', icon: '💼' },
-  { id: 'pack_1200', paws: 1200, priceUah: 399, desc: 'Премиум кошелек. Нарядите всех котиков!', badge: 'Скидка 20%', icon: '🏺' },
-  { id: 'pack_3000', paws: 3000, priceUah: 799, desc: 'Кошачий олигарх! Разблокируйте вообще всё.', badge: 'Скидка 33%', icon: '🏦' },
+  { id: 'pack_100', paws: 100, priceUah: 49, desc: 'Начальный набор лапок для мелких покупок.', badge: 'Популярно' },
+  { id: 'pack_300', paws: 300, priceUah: 129, desc: 'Хороший старт. Хватит на пару крутых очков!', badge: 'Выгода 12%' },
+  { id: 'pack_500', paws: 500, priceUah: 199, desc: 'Золотой стандарт. Отличный баланс цены и объема.', badge: 'Рекомендовано' },
+  { id: 'pack_1200', paws: 1200, priceUah: 399, desc: 'Премиум кошелек. Нарядите всех котиков!', badge: 'Скидка 20%' },
+  { id: 'pack_3000', paws: 3000, priceUah: 799, desc: 'Кошачий олигарх! Разблокируйте вообще всё.', badge: 'Скидка 33%' },
 ];
 
 export const ShopWindow: React.FC<ShopWindowProps> = ({
@@ -51,13 +79,13 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
   onRedeemPromo,
 }) => {
   const [activeTab, setActiveTab] = useState<'skins' | 'accessories' | 'food' | 'hygiene' | 'topup'>('skins');
+  const [activeSubcategory, setActiveSubcategory] = useState<string>('all');
   const [selectedSkinId, setSelectedSkinId] = useState<string>(allSkins[0]?.id || '');
 
   // Dynamic mapping of all items to a generic structure
   const shopProducts = React.useMemo<ShopProduct[]>(() => {
     const products: ShopProduct[] = [];
 
-    // Add skins and accessories from allSkins
     allSkins.forEach(skin => {
       if (!skin.accessory) {
         products.push({
@@ -71,19 +99,18 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
           originalItem: skin
         });
       } else {
-        // Detect subcategory for accessory dynamically from its key/id!
         let subcat = 'Другие аксессуары';
         const accId = skin.accessory.toLowerCase();
         if (accId.includes('boots') || accId.includes('footwear') || accId.includes('shoes') || accId.includes('tapochki') || accId.includes('sapozhki')) {
-          subcat = 'Обувь и Лапки 🥾';
+          subcat = 'Обувь и Лапки';
         } else if (accId.includes('hat') || accId.includes('halo') || accId.includes('crown') || accId.includes('cap') || accId.includes('shlyapa') || accId.includes('kolpak')) {
-          subcat = 'Головные уборы 🎩';
+          subcat = 'Головные уборы';
         } else if (accId.includes('glasses') || accId.includes('eyewear') || accId.includes('headphones') || accId.includes('ochki') || accId.includes('naushniki')) {
-          subcat = 'Очки и Наушники 🕶️';
+          subcat = 'Очки и Наушники';
         } else if (accId.includes('collar') || accId.includes('bell') || accId.includes('ribbon') || accId.includes('bow') || accId.includes('scarf') || accId.includes('osheynik') || accId.includes('bantik') || accId.includes('sharf')) {
-          subcat = 'Шейные украшения 🎀';
+          subcat = 'Шейные украшения';
         } else if (accId.includes('wings') || accId.includes('krylya')) {
-          subcat = 'Спина и Крылья 🦋';
+          subcat = 'Спина и Крылья';
         }
 
         products.push({
@@ -99,7 +126,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
       }
     });
 
-    // Add food and hygiene from CONSUMABLE_ITEMS
     CONSUMABLE_ITEMS.forEach(cons => {
       const isFood = cons.type === 'food';
       products.push({
@@ -110,7 +136,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
         cost: cons.cost,
         rarity: cons.rarity,
         category: isFood ? 'food' : 'hygiene',
-        subcategory: isFood ? 'Корм и Лакомства 🐟' : cons.type === 'soap' ? 'Мыло и Пенка 🧼' : 'Кошачьи Игрушки 🐭',
+        subcategory: isFood ? 'Корм и Лакомства' : cons.type === 'soap' ? 'Мыло и Пенка' : 'Кошачьи Игрушки',
         originalItem: cons
       });
     });
@@ -154,7 +180,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
   const handleTouchEnd = (e: React.TouchEvent) => {
     const diffX = e.changedTouches[0].clientX - touchStartX.current;
     const diffY = e.changedTouches[0].clientY - touchStartY.current;
-    
     if (diffY > 100 && Math.abs(diffX) < 60) {
       onMinimize();
     }
@@ -165,17 +190,13 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
   const selectedItem = React.useMemo(() => {
     const found = shopProducts.find(p => p.id === selectedSkinId);
     if (found) return found;
-    // Fallback to first product in current active category
     const categoryProducts = shopProducts.filter(p => p.category === activeTab);
     return categoryProducts[0] || shopProducts[0];
   }, [shopProducts, selectedSkinId, activeTab]);
 
   const categorizedProducts = React.useMemo<Record<string, ShopProduct[]>>(() => {
     if (activeTab === 'topup') return {};
-    
     const filtered = shopProducts.filter(p => p.category === activeTab);
-    
-    // Group by subcategory
     const groups: Record<string, ShopProduct[]> = {};
     filtered.forEach(p => {
       const sub = p.subcategory || 'Общие';
@@ -184,22 +205,33 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
       }
       groups[sub].push(p);
     });
-    
     return groups;
   }, [shopProducts, activeTab]);
+
+  const subcategories = React.useMemo<string[]>(() => {
+    if (activeTab === 'topup') return [];
+    const filtered = shopProducts.filter(p => p.category === activeTab);
+    const subs = new Set<string>();
+    filtered.forEach(p => {
+      subs.add(p.subcategory || 'Общие');
+    });
+    return ['all', ...Array.from(subs)];
+  }, [shopProducts, activeTab]);
+
+  const filteredCategorizedProducts = React.useMemo<Record<string, ShopProduct[]>>(() => {
+    if (activeSubcategory === 'all') return categorizedProducts;
+    if (!categorizedProducts[activeSubcategory]) return {};
+    return { [activeSubcategory]: categorizedProducts[activeSubcategory] };
+  }, [categorizedProducts, activeSubcategory]);
 
   const isConsumableProduct = selectedItem.category === 'food' || selectedItem.category === 'hygiene';
 
   const getRarityStyle = (rarity: string) => {
     switch (rarity) {
-      case 'legendary':
-        return 'bg-amber-500/15 border-amber-500/30 text-amber-400';
-      case 'epic':
-        return 'bg-purple-500/15 border-purple-500/30 text-purple-400';
-      case 'rare':
-        return 'bg-sky-500/15 border-sky-500/30 text-sky-400';
-      default:
-        return 'bg-slate-500/15 border-white/10 text-slate-400';
+      case 'legendary': return 'bg-amber-500/15 border-amber-500/30 text-amber-400';
+      case 'epic': return 'bg-purple-500/15 border-purple-500/30 text-purple-400';
+      case 'rare': return 'bg-sky-500/15 border-sky-500/30 text-sky-400';
+      default: return 'bg-slate-500/15 border-white/10 text-slate-400';
     }
   };
 
@@ -290,10 +322,8 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
 
     setTimeout(() => {
       setPaymentStatus('success');
-      
       if (checkoutPack) {
         onDonatePaws(checkoutPack.paws);
-
         const transId = `MP-${Math.floor(100000 + Math.random() * 900000)}`;
         const now = new Date();
         const formattedDate = now.toLocaleDateString('ru-RU', {
@@ -330,9 +360,10 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
       title="Кошачий бутик & Банк"
       subtitle="Магазин"
       headerRight={
-        <div className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-400/20 px-3 py-1 rounded-full pointer-events-auto shrink-0">
-          <span className="text-xs text-sky-400 font-extrabold font-mono">
-            🐾 {profile.paws}
+        <div className="flex items-center gap-1.5 bg-sky-500/10 border border-sky-400/20 px-3 py-1 rounded-full pointer-events-auto shrink-0 text-sky-400">
+          <Sparkles size={11} className="animate-pulse" />
+          <span className="text-xs font-extrabold font-mono">
+            {profile.paws}
           </span>
         </div>
       }
@@ -340,16 +371,16 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
         
         {activeTab !== 'topup' && (
-          <div className="w-full lg:w-60 bg-black/25 border-b lg:border-b-0 lg:border-r border-white/5 p-4 flex flex-col items-center justify-center text-center shrink-0 max-lg:py-3">
+          <div className="hidden lg:flex lg:w-60 bg-black/25 border-r border-white/5 p-4 flex-col items-center justify-center text-center shrink-0">
             {isConsumableProduct ? (
               <>
                 <span className="text-[9px] font-mono tracking-wider text-slate-400 uppercase mb-2 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
                   Карточка товара
                 </span>
 
-                <div className="w-32 h-32 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center justify-center shadow-inner relative overflow-hidden animate-fade-in">
+                <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center justify-center shadow-inner relative overflow-hidden animate-fade-in">
                   <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10" />
-                  <span className="text-6xl filter drop-shadow-md animate-pulse">{selectedItem.emoji}</span>
+                  <div className="filter drop-shadow-md">{getConsumableIcon(selectedItem.id, "w-14 h-14 md:w-16 md:h-16")}</div>
                   <div className="absolute bottom-2 bg-black/50 border border-white/10 px-2 py-0.5 rounded-full text-[9px] text-slate-300 font-mono">
                     В запасе: <span className="font-bold text-amber-300">{profile.inventory?.[selectedItem.id] || 0} шт</span>
                   </div>
@@ -384,14 +415,23 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
 
                 <div className="w-full mt-3">
                   <button
+                    disabled={profile.paws < selectedItem.cost}
                     onClick={() => {
                       triggerHaptic();
                       onPurchase(selectedItem.id);
                     }}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-[11px] cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95 border border-emerald-400/15 shadow-lg shadow-emerald-500/10 min-h-[44px]"
+                    className={`w-full py-3 rounded-xl text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition-all active:scale-95 border min-h-[44px] ${
+                      profile.paws < selectedItem.cost
+                        ? 'bg-slate-800 border-white/5 text-slate-400 cursor-not-allowed opacity-60'
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 cursor-pointer border-emerald-400/15 shadow-lg shadow-emerald-500/10'
+                    }`}
                   >
                     <ShoppingBag size={11} />
-                    <span>Купить за 🐾 {selectedItem.cost}</span>
+                    <span>
+                      {profile.paws < selectedItem.cost
+                        ? `Недостаточно лапок (${selectedItem.cost})`
+                        : `Купить за ${selectedItem.cost}`}
+                    </span>
                   </button>
                 </div>
               </>
@@ -401,7 +441,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                   Кабина примерки
                 </span>
 
-                <div className="w-32 h-32 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center shadow-inner relative overflow-hidden">
+                <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center shadow-inner relative overflow-hidden">
                   <CatRenderer
                     breed={isAccessory ? activeCat.breed : (selectedItem.originalItem as any).breed}
                     color={colors.color}
@@ -447,14 +487,23 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                     </button>
                   ) : (
                     <button
+                      disabled={profile.paws < selectedItem.cost}
                       onClick={() => {
                         triggerHaptic();
                         onPurchase(selectedItem.id);
                       }}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-extrabold text-[11px] cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95 border border-sky-400/15 shadow-lg shadow-sky-500/10 min-h-[44px]"
+                      className={`w-full py-3 rounded-xl text-white font-extrabold text-[11px] flex items-center justify-center gap-1 transition-all active:scale-95 border min-h-[44px] ${
+                        profile.paws < selectedItem.cost
+                          ? 'bg-slate-800 border-white/5 text-slate-400 cursor-not-allowed opacity-60'
+                          : 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 cursor-pointer border-sky-400/15 shadow-lg shadow-sky-500/10'
+                      }`}
                     >
                       <ShoppingBag size={11} />
-                      <span>Купить за 🐾 {selectedItem.cost}</span>
+                      <span>
+                        {profile.paws < selectedItem.cost
+                          ? `Недостаточно лапок (${selectedItem.cost})`
+                          : `Купить за ${selectedItem.cost}`}
+                      </span>
                     </button>
                   )}
                 </div>
@@ -463,69 +512,106 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto flex flex-col bg-slate-950/20 p-4 md:p-5">
-          <div className="flex bg-black/40 border border-white/5 rounded-xl p-0.5 max-w-md self-center lg:self-start mb-4 text-[11px] font-bold overflow-x-auto">
-            <button
-              onClick={() => {
-                setActiveTab('skins');
-                const firstSkin = shopProducts.find(p => p.category === 'skins');
-                if (firstSkin) setSelectedSkinId(firstSkin.id);
-              }}
-              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] whitespace-nowrap ${
-                activeTab === 'skins' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Кошачьи окрасы
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('accessories');
-                const firstAcc = shopProducts.find(p => p.category === 'accessories');
-                if (firstAcc) setSelectedSkinId(firstAcc.id);
-              }}
-              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] whitespace-nowrap ${
-                activeTab === 'accessories' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Аксессуары
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('food');
-                const firstFood = shopProducts.find(p => p.category === 'food');
-                if (firstFood) setSelectedSkinId(firstFood.id);
-              }}
-              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] whitespace-nowrap ${
-                activeTab === 'food' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Питание
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('hygiene');
-                const firstHyg = shopProducts.find(p => p.category === 'hygiene');
-                if (firstHyg) setSelectedSkinId(firstHyg.id);
-              }}
-              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer min-h-[44px] whitespace-nowrap ${
-                activeTab === 'hygiene' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Гигиена
-            </button>
-            <button
-              onClick={() => setActiveTab('topup')}
-              className={`px-4 py-2.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 min-h-[44px] whitespace-nowrap ${
-                activeTab === 'topup' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <span>Пополнить</span>
-            </button>
+        {/* ПРАВАЯ КОЛОНКА — ИСПРАВЛЕННЫЕ ТАБЫ И КОНТЕНТ */}
+        <div className="flex-1 flex flex-col min-h-0 relative bg-slate-950/20">
+          <div className="flex-1 overflow-y-auto p-4 md:p-5 pb-24 lg:pb-5">
+          
+          {/* 1. КОНТЕЙНЕР С ТАБАМИ (Здесь была ошибка на скриншоте) */}
+          <div className="flex flex-shrink-0 w-full overflow-x-auto no-scrollbar mb-4">
+            <div className="flex bg-black/40 border border-white/5 rounded-xl p-1 min-h-[44px] w-full max-w-full lg:max-w-md mx-auto lg:mx-0 text-[11px] font-bold gap-1">
+              <button
+                onClick={() => {
+                  setActiveTab('skins');
+                  setActiveSubcategory('all');
+                  const firstSkin = shopProducts.find(p => p.category === 'skins');
+                  if (firstSkin) setSelectedSkinId(firstSkin.id);
+                }}
+                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
+                  activeTab === 'skins' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Кошачьи окрасы
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('accessories');
+                  setActiveSubcategory('all');
+                  const firstAcc = shopProducts.find(p => p.category === 'accessories');
+                  if (firstAcc) setSelectedSkinId(firstAcc.id);
+                }}
+                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
+                  activeTab === 'accessories' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Аксессуары
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('food');
+                  setActiveSubcategory('all');
+                  const firstFood = shopProducts.find(p => p.category === 'food');
+                  if (firstFood) setSelectedSkinId(firstFood.id);
+                }}
+                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
+                  activeTab === 'food' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Питание
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('hygiene');
+                  setActiveSubcategory('all');
+                  const firstHyg = shopProducts.find(p => p.category === 'hygiene');
+                  if (firstHyg) setSelectedSkinId(firstHyg.id);
+                }}
+                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
+                  activeTab === 'hygiene' ? 'bg-white/10 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Гигиена
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('topup');
+                  setActiveSubcategory('all');
+                }}
+                className={`flex-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
+                  activeTab === 'topup' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Пополнить
+              </button>
+            </div>
           </div>
+
+          {activeTab !== 'topup' && subcategories.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 border-b border-white/5 mb-4 shrink-0">
+              {subcategories.map((sub) => {
+                const isSelected = activeSubcategory === sub;
+                return (
+                  <button
+                    key={sub}
+                    onClick={() => {
+                      triggerHaptic();
+                      setActiveSubcategory(sub);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                      isSelected
+                        ? 'bg-sky-500/15 border-sky-500/40 text-sky-400 font-extrabold shadow-sm'
+                        : 'bg-white/5 border-transparent text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {sub === 'all' ? 'Все товары' : sub}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {activeTab !== 'topup' ? (
             <div className="flex-1 flex flex-col space-y-6 pb-3">
-              {Object.entries(categorizedProducts).map(([subcatName, productsValue]) => {
+              {Object.entries(filteredCategorizedProducts).map(([subcatName, productsValue]) => {
                 const products = productsValue as ShopProduct[];
                 return (
                   <div key={subcatName} className="space-y-2">
@@ -575,7 +661,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
 
                             <div className="w-14 h-14 rounded-xl bg-black/40 flex items-center justify-center my-1.5 group-hover:scale-105 transition-transform overflow-hidden relative">
                               {isConsumable ? (
-                                <span className="text-3xl">{item.emoji}</span>
+                                getConsumableIcon(item.id, "w-8 h-8")
                               ) : (
                                 <CatRenderer
                                   breed={(item.originalItem as any).accessory ? activeCat.breed : (item.originalItem as Skin).breed}
@@ -592,7 +678,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                             <div className="w-full">
                               <h4 className="text-[11px] font-bold text-slate-200 truncate leading-tight">{item.name}</h4>
                               <p className="text-[9px] text-sky-400 font-extrabold font-mono mt-0.5">
-                                {isConsumable ? `🐾 ${item.cost}` : isUnlocked ? 'В наличии' : `🐾 ${item.cost}`}
+                                {isConsumable ? `${item.cost} лапок` : isUnlocked ? 'В наличии' : `${item.cost} лапок`}
                               </p>
                             </div>
                           </button>
@@ -632,7 +718,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                     </span>
 
                     <div className="flex items-center gap-2.5">
-                      <span className="text-2xl">{pack.icon}</span>
+                      <ShoppingBag size={24} className="text-amber-500 shrink-0" />
                       <div className="text-left">
                         <h4 className="text-xs font-black text-white">+{pack.paws} лапок</h4>
                         <span className="text-[9px] text-slate-400 leading-none">{pack.desc}</span>
@@ -651,6 +737,85 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+          </div>
+
+          {/* Mobile Quick Buy/Equip Floating Bar */}
+          {activeTab !== 'topup' && (
+            <div className="lg:hidden absolute bottom-3 left-3 right-3 bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl border border-white/10 flex items-center justify-between gap-3 shadow-2xl z-10">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-9 h-9 bg-black/40 rounded-xl flex items-center justify-center text-xl shrink-0">
+                  {isConsumableProduct ? getConsumableIcon(selectedItem.id, "w-5 h-5") : selectedItem.emoji || '✨'}
+                </div>
+                <div className="min-w-0 text-left">
+                  <h4 className="text-[10px] font-extrabold text-white truncate">{selectedItem.name}</h4>
+                  <p className="text-[9px] text-slate-400">
+                    {isConsumableProduct 
+                      ? `В наличии: ${profile.inventory?.[selectedItem.id] || 0} шт` 
+                      : profile.unlockedSkins.includes(selectedItem.id) ? 'Уже разблокировано' : `${selectedItem.cost} 🐾`
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* Buy / Equip Button */}
+              <div className="shrink-0">
+                {isConsumableProduct ? (
+                  <button
+                    disabled={profile.paws < selectedItem.cost}
+                    onClick={() => {
+                      triggerHaptic();
+                      onPurchase(selectedItem.id);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-white font-black text-[9px] flex items-center gap-1 transition-all active:scale-95 border min-h-[36px] ${
+                      profile.paws < selectedItem.cost
+                        ? 'bg-slate-800 border-white/5 text-slate-400 cursor-not-allowed opacity-60'
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 border-emerald-400/15 shadow-md shadow-emerald-500/10'
+                    }`}
+                  >
+                    <ShoppingBag size={10} />
+                    <span>Купить за {selectedItem.cost} 🐾</span>
+                  </button>
+                ) : profile.unlockedSkins.includes(selectedItem.id) ? (
+                  <button
+                    onClick={() => {
+                      triggerHaptic();
+                      onApply(activeCat.id, selectedItem.id);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg font-black text-[9px] cursor-pointer flex items-center gap-1.5 transition-all active:scale-95 border min-h-[36px] ${
+                      activeCat.skinId === selectedItem.id || (isAccessory && (activeCat as any).accessory === selectedItem.originalItem.accessory)
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                        : 'bg-white/10 hover:bg-white/15 border-white/10 text-slate-200'
+                    }`}
+                  >
+                    {activeCat.skinId === selectedItem.id || (isAccessory && (activeCat as any).accessory === selectedItem.originalItem.accessory) ? (
+                      <>
+                        <Check size={10} />
+                        <span>Надето</span>
+                      </>
+                    ) : (
+                      <span>Надеть</span>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    disabled={profile.paws < selectedItem.cost}
+                    onClick={() => {
+                      triggerHaptic();
+                      onPurchase(selectedItem.id);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-white font-black text-[9px] flex items-center gap-1 transition-all active:scale-95 border min-h-[36px] ${
+                      profile.paws < selectedItem.cost
+                        ? 'bg-slate-800 border-white/5 text-slate-400 cursor-not-allowed opacity-60'
+                        : 'bg-sky-500 hover:bg-sky-600 border-sky-400/15 shadow-md shadow-sky-500/10'
+                    }`}
+                  >
+                    <ShoppingBag size={10} />
+                    <span>Купить за {selectedItem.cost} 🐾</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -964,7 +1129,6 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                       <span>ПОСТАВЩИК:</span>
                       <span>MaksyPay-ShelterOS</span>
                     </div>
-                    {/* Убрана строка "УСТРОЙСТВО" */}
                     <div className="flex justify-between">
                       <span>КАРТА:</span>
                       <span className="truncate max-w-[150px] font-mono text-slate-900 font-bold">{receiptData.cardNumber}</span>
@@ -980,7 +1144,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                   <div className="space-y-1 text-[9px] font-semibold text-slate-800">
                     <div className="flex justify-between">
                       <span>ТОВАР:</span>
-                      <span className="font-bold text-slate-950">+{receiptData.paws} 🐾 Лапок</span>
+                      <span className="font-bold text-slate-950">+{receiptData.paws} Лапок</span>
                     </div>
                     <div className="flex justify-between">
                       <span>БАЗОВАЯ СУММА:</span>
@@ -1006,7 +1170,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                   <div className="border-b border-dashed border-slate-300 my-1" />
 
                   <div className="text-center text-[8px] text-slate-400 space-y-0.5 pt-0.5">
-                    <p>Спасибо за вашу щедрость и заботу! ♥</p>
+                    <p>Спасибо за вашу щедрость и заботу!</p>
                     <p className="font-bold text-slate-500">Maksym Skorina UI/UX Designs</p>
                   </div>
                 </div>

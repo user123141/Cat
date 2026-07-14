@@ -1,11 +1,12 @@
+// src/components/MacCatWindowFrame.tsx
 import React, { useEffect, useState } from 'react';
 import { motion, PanInfo } from 'motion/react';
-import { useZIndex } from '../context/ZIndexContext';
+import { useWindowManager, WindowId } from '../context/WindowManagerContext';
 import { triggerHapticLight } from '../utils/audio';
 import { getWindowLayout } from '../utils/windowManager';
 
 interface MacCatWindowFrameProps {
-  id: string;
+  id: string; // теперь это WindowId, но мы оставим string для совместимости
   onClose: () => void;
   onMinimize?: () => void;
   title: React.ReactNode;
@@ -25,7 +26,7 @@ export const MacCatWindowFrame: React.FC<MacCatWindowFrameProps> = ({
   className = '',
   headerRight,
 }) => {
-  const { getZIndex, focusWindow } = useZIndex();
+  const { getZIndex, focusWindow } = useWindowManager();
   const [isMobile, setIsMobile] = useState(false);
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
 
@@ -49,7 +50,7 @@ export const MacCatWindowFrame: React.FC<MacCatWindowFrameProps> = ({
     }
   };
 
-  const currentZ = getZIndex(id);
+  const currentZ = getZIndex(id as WindowId);
   const layout = getWindowLayout(id, dimensions.width, dimensions.height);
 
   return (
@@ -64,9 +65,9 @@ export const MacCatWindowFrame: React.FC<MacCatWindowFrameProps> = ({
       dragElastic={isMobile ? { top: 0.05, bottom: 0.5 } : 0.05}
       dragMomentum={false}
       onDragEnd={handleDragEnd}
-      onPointerDown={() => focusWindow(id)}
+      onPointerDown={() => focusWindow(id as WindowId)}
       style={{
-        zIndex: currentZ,
+        zIndex: isMobile ? 45 + currentZ : currentZ,
         width: layout.width,
         height: layout.height,
         top: layout.top,
@@ -84,44 +85,54 @@ export const MacCatWindowFrame: React.FC<MacCatWindowFrameProps> = ({
         ${className}
       `}
     >
-      {isMobile && (
-        <div className="window-drag-handle w-full flex flex-col items-center pt-2.5 pb-1 shrink-0 bg-black/40">
-          <div className="w-10 h-1 bg-white/30 rounded-full" />
-        </div>
-      )}
-
-      <div className="window-drag-handle h-10 bg-black/40 border-b border-white/5 px-3 flex items-center justify-between select-none cursor-grab active:cursor-grabbing shrink-0">
-        <div className="flex items-center pointer-events-auto -ml-2">
-          <button
-            onClick={() => { triggerHapticLight(); onClose(); }}
-            className="w-8 h-8 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-            title="Закрыть"
-          >
-            <div className="w-3.5 h-3.5 rounded-full bg-mac-red hover:brightness-90 flex items-center justify-center group relative">
-              <span className="text-[8px] text-red-950 font-black opacity-0 group-hover:opacity-100 transition-opacity absolute">×</span>
-            </div>
-          </button>
-          {onMinimize && (
+      {isMobile ? (
+        <div className="window-drag-handle bg-black/40 border-b border-white/5 px-4 pt-2.5 pb-3 flex flex-col gap-2.5 select-none cursor-grab active:cursor-grabbing shrink-0">
+          <div className="w-10 h-1 bg-white/20 rounded-full self-center" />
+          <div className="flex items-center justify-between">
             <button
-              onClick={() => { triggerHapticLight(); onMinimize(); }}
-              className="w-8 h-8 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-              title="Свернуть"
+              onClick={() => { triggerHapticLight(); onClose(); }}
+              className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[10px] font-extrabold text-slate-300 hover:text-white cursor-pointer active:scale-95 transition-all"
             >
-              <div className="w-3.5 h-3.5 rounded-full bg-mac-yellow hover:brightness-90 flex items-center justify-center group relative">
-                <span className="text-[8px] text-yellow-950 font-black opacity-0 group-hover:opacity-100 transition-opacity absolute">−</span>
+              Закрыть
+            </button>
+            <div className="text-[11px] font-black text-slate-100 tracking-wide uppercase font-sans">{title}</div>
+            <div className="min-w-[50px] flex justify-end">{headerRight || <div className="w-3" />}</div>
+          </div>
+        </div>
+      ) : (
+        <div className="window-drag-handle h-10 bg-black/40 border-b border-white/5 px-3 flex items-center justify-between select-none cursor-grab active:cursor-grabbing shrink-0">
+          <div className="flex items-center pointer-events-auto -ml-2">
+            <button
+              onClick={() => { triggerHapticLight(); onClose(); }}
+              className="w-8 h-8 flex items-center justify-center transition-all cursor-pointer active:scale-90"
+              title="Закрыть"
+            >
+              <div className="w-3.5 h-3.5 rounded-full bg-mac-red hover:brightness-90 flex items-center justify-center group relative">
+                <span className="text-[8px] text-red-950 font-black opacity-0 group-hover:opacity-100 transition-opacity absolute">×</span>
               </div>
             </button>
-          )}
-          <div className="w-8 h-8 flex items-center justify-center">
-            <div className="w-3.5 h-3.5 rounded-full bg-mac-green opacity-70"></div>
+            {onMinimize && (
+              <button
+                onClick={() => { triggerHapticLight(); onMinimize(); }}
+                className="w-8 h-8 flex items-center justify-center transition-all cursor-pointer active:scale-90"
+                title="Свернуть"
+              >
+                <div className="w-3.5 h-3.5 rounded-full bg-mac-yellow hover:brightness-90 flex items-center justify-center group relative">
+                  <span className="text-[8px] text-yellow-950 font-black opacity-0 group-hover:opacity-100 transition-opacity absolute">−</span>
+                </div>
+              </button>
+            )}
+            <div className="w-8 h-8 flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-mac-green opacity-70"></div>
+            </div>
+            {subtitle && (
+              <span className="text-[10px] font-semibold text-slate-400 ml-1.5 tracking-wide max-sm:hidden">{subtitle}</span>
+            )}
           </div>
-          {subtitle && (
-            <span className="text-[10px] font-semibold text-slate-400 ml-1.5 tracking-wide max-sm:hidden">{subtitle}</span>
-          )}
+          <div className="text-[11px] md:text-sm font-bold text-slate-200 truncate px-1.5">{title}</div>
+          <div className="min-w-8 flex justify-end">{headerRight || <div className="w-3" />}</div>
         </div>
-        <div className="text-[11px] md:text-sm font-bold text-slate-200 truncate px-1.5">{title}</div>
-        <div className="min-w-8 flex justify-end">{headerRight || <div className="w-3" />}</div>
-      </div>
+      )}
 
       <div className="flex-1 overflow-hidden flex flex-col min-h-0 relative">{children}</div>
     </motion.div>

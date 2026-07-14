@@ -1,8 +1,11 @@
+// src/hooks/useGameState.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Cat, PlayerProfile, DailyQuest, Skin, NotificationItem, GameAnalytics, DiaryEntry } from '../types';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { FirebaseLogger } from '../utils/FirebaseLogger';
+
+// ==================== КОНСТАНТЫ ====================
 
 export const INITIAL_SKINS: Skin[] = [
   // Породы котиков
@@ -46,7 +49,6 @@ const generateExtraSkins = (): Skin[] => {
     { key: 'star', name: 'Звездная Заколка', desc: 'Сверкающая заколка для ушка.', icon: '⭐' },
   ];
 
-  // 1. Создаем 50 уникальных брендовых аксессуаров
   for (let i = 0; i < 50; i++) {
     const accType = accessories[i % accessories.length];
     const colorIdx = Math.floor(i / 5) % colors.length;
@@ -68,7 +70,6 @@ const generateExtraSkins = (): Skin[] => {
     });
   }
 
-  // 2. Создаем 50 уникальных дизайнерских окрасов для разных пород
   const breeds = ['British Shorthair', 'Scottish Fold', 'Siamese', 'Persian', 'Sphynx'];
   const breedsRu = ['Британец', 'Скоттиш', 'Сиам', 'Перс', 'Сфинкс'];
   const themes = [
@@ -113,18 +114,13 @@ const generateExtraSkins = (): Skin[] => {
 export const ALL_SKINS_LIST: Skin[] = [...INITIAL_SKINS, ...generateExtraSkins()];
 
 export const CONSUMABLE_ITEMS: { id: string; name: string; emoji: string; description: string; cost: number; type: 'food' | 'soap' | 'toy'; boost: number; xpBoost: number; rarity: 'common' | 'rare' | 'epic' | 'legendary' }[] = [
-  // Еда (Голод)
   { id: 'food_kibble', name: 'Премиум корм', emoji: '🎚️', description: 'Хрустящий сбалансированный сухой корм. Насыщает +20 сытости, дает +10 XP.', cost: 12, type: 'food', boost: 20, xpBoost: 10, rarity: 'common' },
   { id: 'food_treat', name: 'Кремовое лакомство', emoji: '🧁', description: 'Нежное кошачье лакомство в тюбике. Восстанавливает +30 сытости и дает +15 XP.', cost: 18, type: 'food', boost: 30, xpBoost: 15, rarity: 'rare' },
   { id: 'food_tuna', name: 'Филе дикого тунца', emoji: '🐟', description: 'Свежайший стейк из глубоководного тунца. Восстанавливает +45 сытости и дает +25 XP.', cost: 28, type: 'food', boost: 45, xpBoost: 25, rarity: 'epic' },
   { id: 'food_steak', name: 'Сочный стейк Прайм', emoji: '🥩', description: 'Мраморная говядина высочайшего класса для котика. Дает +75 сытости и +45 XP!', cost: 45, type: 'food', boost: 75, xpBoost: 45, rarity: 'legendary' },
-
-  // Гигиена (Мыло)
   { id: 'soap_lavender', name: 'Лавандовое мыло', emoji: '🧼', description: 'Мягкое мыло с экстрактом лаванды для расслабления. +25 гигиены, +12 XP.', cost: 15, type: 'soap', boost: 25, xpBoost: 12, rarity: 'common' },
   { id: 'soap_minerals', name: 'Мыло с минералами', emoji: '🧴', description: 'Лечебная пенка с минералами Мертвого моря. +50 гигиены, +20 XP.', cost: 25, type: 'soap', boost: 50, xpBoost: 20, rarity: 'rare' },
   { id: 'soap_charcoal', name: 'Угольный эко-шампунь', emoji: '🛁', description: 'Глубокое детокс-очищение шерстки до сияния. +85 гигиены, +35 XP!', cost: 45, type: 'soap', boost: 85, xpBoost: 35, rarity: 'epic' },
-
-  // Радость (Игрушки)
   { id: 'toy_wand', name: 'Удочка-дразнилка', emoji: '🪶', description: 'Перо на веревочке для весёлых прыжков. +25 счастья, +15 XP, -8 энергии.', cost: 16, type: 'toy', boost: 25, xpBoost: 15, rarity: 'common' },
   { id: 'toy_laser', name: 'Лазерная указка', emoji: '🔦', description: 'Неуловимая красная лазерная точка. +55 счастья, +30 XP, -15 энергии.', cost: 30, type: 'toy', boost: 55, xpBoost: 30, rarity: 'rare' },
   { id: 'toy_catnip', name: 'Мышка с кошачьей мятой', emoji: '🐭', description: 'Игрушка с органической мятой для безумного счастья. +90 счастья, +50 XP!', cost: 50, type: 'toy', boost: 90, xpBoost: 50, rarity: 'epic' },
@@ -153,6 +149,8 @@ export const sendNativeNotification = (title: string, body: string) => {
     }
   }
 };
+
+// ==================== ХУК ====================
 
 export const useGameState = () => {
   const [profile, setProfile] = useState<PlayerProfile | null>(() => {
@@ -256,18 +254,20 @@ export const useGameState = () => {
                 energy = 100;
                 status = 'idle';
                 const idleHours = hours - sleepHoursToFull;
-                hunger = Math.max(0, hunger - (8 * hours));
-                cleanliness = Math.max(0, cleanliness - (5 * hours));
+                
+                // Low decay during sleep hours, normal decay during idle hours
+                hunger = Math.max(0, hunger - (1.5 * sleepHoursToFull) - (8 * idleHours));
+                cleanliness = Math.max(0, cleanliness - (1.0 * sleepHoursToFull) - (5 * idleHours));
                 energy = Math.max(0, energy - (6 * idleHours));
                 
                 const hungerPenalty = hunger < 30 ? 4 : 0;
                 const cleanPenalty = cleanliness < 30 ? 4 : 0;
-                happiness = Math.max(0, happiness - (6 * hours) - ((hungerPenalty + cleanPenalty) * idleHours));
+                happiness = Math.max(0, happiness - (0.5 * sleepHoursToFull) - (6 * idleHours) - ((hungerPenalty + cleanPenalty) * idleHours));
               } else {
                 energy = Math.min(100, energy + (25 * hours));
-                hunger = Math.max(0, hunger - (8 * hours));
-                cleanliness = Math.max(0, cleanliness - (5 * hours));
-                happiness = Math.max(0, happiness - (3 * hours));
+                hunger = Math.max(0, hunger - (1.5 * hours));
+                cleanliness = Math.max(0, cleanliness - (1.0 * hours));
+                happiness = Math.max(0, happiness - (0.5 * hours));
               }
             } else {
               hunger = Math.max(0, hunger - (8 * hours));
@@ -297,11 +297,11 @@ export const useGameState = () => {
       return null;
     }
   });
+
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [syncing, setSyncing] = useState<boolean>(false);
   
-  // Sync Simulation States
   const [isOfflineMode, setIsOfflineMode] = useState<boolean>(false);
   const [syncLog, setSyncLog] = useState<string[]>(['[Система] Лог синхронизации активирован. Ожидание сеанса.']);
   const [lastSyncedTime, setLastSyncedTime] = useState<string>('Не синхронизировано');
@@ -319,6 +319,47 @@ export const useGameState = () => {
   });
 
   const playTimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ссылка на текущий профиль для избежания замыканий
+  const profileRef = useRef(profile);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+
+  // Сохранение профиля в localStorage с обновлённым lastSavedTime
+  useEffect(() => {
+    if (profile) {
+      const now = Date.now();
+      const updated = { ...profile, lastSavedTime: now };
+      localStorage.setItem('maccat_profile', JSON.stringify(updated));
+    }
+  }, [profile]);
+
+  // Отслеживание статуса сети
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Устанавливаем начальное значение
+    setIsOnline(navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Вспомогательная функция для обновления профиля с автоматическим обновлением lastSavedTime
+  const updateProfile = useCallback((updater: (prev: PlayerProfile) => PlayerProfile) => {
+    setProfile((prev) => {
+      if (!prev) return null;
+      const updated = updater(prev);
+      return { ...updated, lastSavedTime: Date.now() };
+    });
+  }, []);
 
   // Trigger Notifications inside App (Dynamic Island style)
   const addNotification = useCallback((title: string, message: string, type: 'info' | 'success' | 'warning' | 'paw') => {
@@ -386,12 +427,6 @@ export const useGameState = () => {
 
   // Initialize and load state
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
     const savedProfile = localStorage.getItem('maccat_profile');
     const savedAnalytics = localStorage.getItem('maccat_analytics');
 
@@ -454,18 +489,9 @@ export const useGameState = () => {
     }, 1000);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
       if (playTimeIntervalRef.current) clearInterval(playTimeIntervalRef.current);
     };
   }, [addNotification, profile]);
-
-  // Синхронизация в localStorage
-  useEffect(() => {
-    if (profile) {
-      localStorage.setItem('maccat_profile', JSON.stringify(profile));
-    }
-  }, [profile]);
 
   // Создание профиля
   const createProfile = useCallback((nickname: string, initialCatName: string, breed: string, skinId: string) => {
@@ -499,7 +525,7 @@ export const useGameState = () => {
     const newProfile: PlayerProfile = {
       nickname,
       avatar: '🐱',
-      paws: 150, // Стартовые лапки
+      paws: 150,
       streak: 1,
       lastActiveDay: new Date().toISOString().split('T')[0],
       theme: 'auto',
@@ -531,9 +557,9 @@ export const useGameState = () => {
     };
 
     const checkedProfile = checkForNewAchievements(newProfile);
-    setProfile(checkedProfile);
+    updateProfile(() => checkedProfile);
     addNotification('Котенок приютен! 🍼', `${initialCatName} присоединился к вашему рабочему столу!`, 'success');
-  }, [addNotification, checkForNewAchievements]);
+  }, [addNotification, checkForNewAchievements, updateProfile]);
 
   // Пассивный упадок характеристик кота
   useEffect(() => {
@@ -604,11 +630,10 @@ export const useGameState = () => {
     return () => clearInterval(decayInterval);
   }, [profile, addNotification, checkForNewAchievements]);
 
-  // Взаимодействие с активным котиком (Покормить, поиграть, искупать, уложить спать)
+  // Взаимодействие с активным котиком
   const interactWithCat = useCallback((action: 'feed' | 'play' | 'clean' | 'sleep' | 'groom' | string) => {
     if (!profile) return;
 
-    // Определяем, используется ли конкретный расходник
     const isConsumable = action.startsWith('food_') || action.startsWith('soap_') || action.startsWith('toy_');
     let itemToUse: typeof CONSUMABLE_ITEMS[0] | undefined;
     let actualActionType: 'feed' | 'play' | 'clean' | 'sleep' | 'groom' = 'feed';
@@ -619,55 +644,66 @@ export const useGameState = () => {
       if (!itemToUse) return;
       targetItemId = itemToUse.id;
       actualActionType = itemToUse.type === 'food' ? 'feed' : itemToUse.type === 'soap' ? 'clean' : 'play';
+      
+      // Strict Resource Guard checking profile inventory before even modifying the state
+      const ownedQty = profile.inventory?.[targetItemId] || 0;
+      if (ownedQty <= 0) {
+        addNotification(
+          'Товар закончился! 🛒',
+          `У вас нет "${itemToUse.name}". Приобретите его во всплывающем меню ухода или в Магазине.`,
+          'warning'
+        );
+        return;
+      }
     } else {
-      // Это общее действие. Попробуем найти доступный предмет этого типа в инвентаре
       actualActionType = action as any;
       if (actualActionType === 'feed') {
-        const availableFood = ['food_kibble', 'food_treat', 'food_tuna', 'food_steak'].find(id => (profile.inventory?.[id] || 0) > 0);
-        if (!availableFood) {
-          addNotification('Еда закончилась! 🐟', 'У вас нет еды в инвентаре. Купите вкусняшки на Кухне или в Магазине!', 'warning');
-          return;
-        }
-        targetItemId = availableFood;
-        itemToUse = CONSUMABLE_ITEMS.find(i => i.id === targetItemId);
+        addNotification('Выберите лакомство 🍗', 'Используйте всплывающее меню ухода для выбора корма!', 'info');
+        return;
       } else if (actualActionType === 'clean') {
-        const availableSoap = ['soap_lavender', 'soap_minerals', 'soap_charcoal'].find(id => (profile.inventory?.[id] || 0) > 0);
-        if (!availableSoap) {
-          addNotification('Мыло закончилось! 🧼', 'У вас нет мыла в инвентаре. Купите его в Магазине!', 'warning');
-          return;
-        }
-        targetItemId = availableSoap;
-        itemToUse = CONSUMABLE_ITEMS.find(i => i.id === targetItemId);
+        addNotification('Выберите средство 🧼', 'Используйте всплывающее меню ухода для выбора мыла!', 'info');
+        return;
       } else if (actualActionType === 'play') {
-        const availableToy = ['toy_wand', 'toy_laser', 'toy_catnip'].find(id => (profile.inventory?.[id] || 0) > 0);
-        if (!availableToy) {
-          addNotification('Игрушки закончились! 🎾', 'У вас нет игрушек в инвентаре. Купите новую игрушку в Магазине!', 'warning');
-          return;
-        }
-        targetItemId = availableToy;
-        itemToUse = CONSUMABLE_ITEMS.find(i => i.id === targetItemId);
-      }
-    }
-
-    // Проверяем наличие предмета, если используется расходник
-    if (itemToUse) {
-      const qty = profile.inventory?.[targetItemId] || 0;
-      if (qty <= 0) {
-        addNotification('Товар закончился! 🛒', `У вас нет "${itemToUse.name}". Приобретите его в Магазине.`, 'warning');
+        addNotification('Выберите игрушку 🎾', 'Используйте всплывающее меню ухода для выбора игрушки!', 'info');
         return;
       }
     }
 
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
 
-      // Клонируем инвентарь для изменения
-      const updatedInventory = { ...(prev.inventory || {}) };
-      if (itemToUse) {
-        updatedInventory[targetItemId] = Math.max(0, (updatedInventory[targetItemId] || 0) - 1);
+      const targetCat = prev.cats.find(cat => cat.id === prev.activeCatId);
+      if (!targetCat) return prev;
+
+      // Abort pre-checks before altering inventory or profile paws!
+      if (targetCat.status === 'sleeping' && actualActionType !== 'sleep') {
+        addNotification('Котик спит 💤', 'Нельзя тревожить котика во сне!', 'warning');
+        return prev;
       }
 
-      let isActionAborted = false;
+      if (actualActionType === 'feed' && targetCat.hunger >= 100) {
+        addNotification('Котик сыт 💤', `${targetCat.name} не хочет кушать прямо сейчас.`, 'info');
+        return prev;
+      }
+
+      if (actualActionType === 'play' && targetCat.energy < 15) {
+        addNotification('Устал 💤', `${targetCat.name} слишком устал, чтобы играть. Отправьте его поспать.`, 'warning');
+        return prev;
+      }
+
+      if (actualActionType === 'clean' && targetCat.cleanliness >= 100) {
+        addNotification('Чистый котик 🧼', `${targetCat.name} уже сверкает чистотой.`, 'info');
+        return prev;
+      }
+
+      // If we got here, the action is fully valid and will succeed!
+      // NOW we safely deduct the resource
+      const updatedInventory = { ...(prev.inventory || {}) };
+      if (itemToUse) {
+        const qty = updatedInventory[targetItemId] || 0;
+        if (qty <= 0) return prev; // Secondary fail-safe
+        updatedInventory[targetItemId] = qty - 1;
+      }
 
       const updatedCats = prev.cats.map((cat) => {
         if (cat.id !== prev.activeCatId) return cat;
@@ -675,45 +711,25 @@ export const useGameState = () => {
         let { hunger, happiness, cleanliness, energy, status, level, xp } = cat;
         let gainedXp = 0;
 
-        if (status === 'sleeping' && actualActionType !== 'sleep') {
-          isActionAborted = true;
-          return cat;
-        }
-
         if (actualActionType === 'feed') {
-          if (hunger >= 100) {
-            isActionAborted = true;
-            addNotification('Котик сыт 💤', `${cat.name} не хочет кушать прямо сейчас.`, 'info');
-            return cat;
-          }
           const boostVal = itemToUse ? itemToUse.boost : 25;
           hunger = Math.min(100, hunger + boostVal);
           gainedXp = itemToUse ? itemToUse.xpBoost : 15;
           status = 'eating';
-          addNotification(`Вкусная трапеза ${itemToUse?.emoji || '🐟'}`, `${cat.name} с аппетитом съел "${itemToUse?.name || 'Лосось'}".`, 'success');
+          addNotification(`Вкусная трапеза ${itemToUse?.emoji || '🐟'}`, `${cat.name} с аппетитом съел "${itemToUse?.name}".`, 'success');
         } else if (actualActionType === 'play') {
-          if (energy < 15) {
-            isActionAborted = true;
-            addNotification('Устал 💤', `${cat.name} слишком устал, чтобы играть. Отправьте его поспать.`, 'warning');
-            return cat;
-          }
           const boostVal = itemToUse ? itemToUse.boost : 30;
           happiness = Math.min(100, happiness + boostVal);
           energy = Math.max(0, energy - (itemToUse ? (itemToUse.id === 'toy_catnip' ? 5 : itemToUse.id === 'toy_laser' ? 15 : 8) : 15));
           gainedXp = itemToUse ? itemToUse.xpBoost : 20;
           status = 'playing';
-          addNotification(`Веселые игры ${itemToUse?.emoji || '🎾'}`, `${cat.name} с радостью играет с "${itemToUse?.name || 'Игрушка'}"!`, 'success');
+          addNotification(`Веселые игры ${itemToUse?.emoji || '🎾'}`, `${cat.name} с радостью играет с "${itemToUse?.name}"!`, 'success');
         } else if (actualActionType === 'clean') {
-          if (cleanliness >= 100) {
-            isActionAborted = true;
-            addNotification('Чистый котик 🧼', `${cat.name} уже сверкает чистотой.`, 'info');
-            return cat;
-          }
           const boostVal = itemToUse ? itemToUse.boost : 35;
           cleanliness = Math.min(100, cleanliness + boostVal);
           gainedXp = itemToUse ? itemToUse.xpBoost : 18;
           status = 'bathing';
-          addNotification(`Теплая ванна ${itemToUse?.emoji || '🧼'}`, `${cat.name} купается с использованием "${itemToUse?.name || 'Мыло'}".`, 'success');
+          addNotification(`Теплая ванна ${itemToUse?.emoji || '🧼'}`, `${cat.name} купается с использованием "${itemToUse?.name}".`, 'success');
         } else if (actualActionType === 'groom') {
           cleanliness = Math.min(100, cleanliness + 20);
           happiness = Math.min(100, happiness + 20);
@@ -730,9 +746,9 @@ export const useGameState = () => {
           }
         }
 
-        if (actualActionType !== 'sleep' && status !== 'sleeping' && !isActionAborted) {
+        if (actualActionType !== 'sleep' && status !== 'sleeping') {
           setTimeout(() => {
-            setProfile((p) => {
+            updateProfile((p) => {
               if (!p) return null;
               return {
                 ...p,
@@ -742,36 +758,34 @@ export const useGameState = () => {
           }, 3500);
         }
 
-        if (!isActionAborted) {
-          xp += gainedXp;
-          const neededXp = level * 100;
-          if (xp >= neededXp) {
-            xp -= neededXp;
-            level += 1;
-            const currentCatName = cat.name;
-            const currentCatId = cat.id;
-            const newLevel = level;
-            setTimeout(() => {
-              addNotification('Новый уровень! 🌟', `${currentCatName} вырос до ${newLevel} уровня! Получено +75 лапок!`, 'success');
-              setProfile((p) => {
-                if (!p) return null;
-                const newDiaryEntry: DiaryEntry = {
-                  id: 'diary_' + Math.random().toString(36).substring(2, 11),
-                  catId: currentCatId,
-                  timestamp: Date.now(),
-                  type: 'level_up',
-                  title: `${currentCatName} достиг ${newLevel} уровня! 🌟`,
-                  description: `Ваш любимец преодолел очередную планку! Теперь он стал взрослее и сильнее. Получено +75 бонусных лапок.`,
-                  icon: '🌟'
-                };
-                return { 
-                  ...p, 
-                  paws: p.paws + 75,
-                  diary: [newDiaryEntry, ...(p.diary || [])]
-                };
-              });
-            }, 400);
-          }
+        xp += gainedXp;
+        const neededXp = level * 100;
+        if (xp >= neededXp) {
+          xp -= neededXp;
+          level += 1;
+          const currentCatName = cat.name;
+          const currentCatId = cat.id;
+          const newLevel = level;
+          setTimeout(() => {
+            addNotification('Новый уровень! 🌟', `${currentCatName} вырос до ${newLevel} уровня! Получено +75 лапок!`, 'success');
+            updateProfile((p) => {
+              if (!p) return null;
+              const newDiaryEntry: DiaryEntry = {
+                id: 'diary_' + Math.random().toString(36).substring(2, 11),
+                catId: currentCatId,
+                timestamp: Date.now(),
+                type: 'level_up',
+                title: `${currentCatName} достиг ${newLevel} уровня! 🌟`,
+                description: `Ваш любимец преодолел очередную планку! Теперь он стал взрослее и сильнее. Получено +75 бонусных лапок.`,
+                icon: '🌟'
+              };
+              return { 
+                ...p, 
+                paws: p.paws + 75,
+                diary: [newDiaryEntry, ...(p.diary || [])]
+              };
+            });
+          }, 400);
         }
 
         return {
@@ -786,11 +800,6 @@ export const useGameState = () => {
         };
       });
 
-      if (isActionAborted) {
-        return prev;
-      }
-
-      // Начисление лапок за действия в зависимости от редкости предмета
       let actionPaws = 0;
       if (itemToUse) {
         if (itemToUse.rarity === 'common') actionPaws = 2;
@@ -798,7 +807,7 @@ export const useGameState = () => {
         else if (itemToUse.rarity === 'epic') actionPaws = 7;
         else if (itemToUse.rarity === 'legendary') actionPaws = 12;
       } else {
-        if (actualActionType === 'groom') actionPaws = 12; // уменьшено с 15
+        if (actualActionType === 'groom') actionPaws = 12;
       }
 
       const updatedQuests = prev.quests.map((q) => {
@@ -818,7 +827,6 @@ export const useGameState = () => {
         return { ...q, progress, completed };
       });
 
-      // Квест на лапки
       const questPawsEarned = updatedQuests.map(q => {
         if (q.type === 'earn_paws' && !q.completed) {
           const newProg = Math.min(q.target, q.progress + actionPaws);
@@ -833,7 +841,6 @@ export const useGameState = () => {
         return q;
       });
 
-      // Обновление аналитики
       setAnalytics((prevAnalytics) => {
         const key = actualActionType === 'feed' ? 'feed' : actualActionType === 'play' ? 'play' : actualActionType === 'clean' ? 'clean' : 'sleep';
         const updatedAct = { ...prevAnalytics.actionsPerformed };
@@ -862,19 +869,18 @@ export const useGameState = () => {
 
       return checkForNewAchievements(nextProfile);
     });
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
-  // Гладить котика кликами (+1 XP и с шансом лапку)
+  // Гладить котика кликами
   const petCatClick = useCallback(() => {
     if (!profile) return;
 
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
 
       const currentClicks = (prev.clicksCount || 0) + 1;
       let extraPaws = 0;
       
-      // Каждый 15-й клик дает лапку
       if (currentClicks % 15 === 0) {
         extraPaws = 1;
         addNotification('Радость котика! 🐾', '+1 лапка за ласку котика!', 'paw');
@@ -884,7 +890,7 @@ export const useGameState = () => {
         if (cat.id !== prev.activeCatId) return cat;
 
         let { xp, level, happiness } = cat;
-        xp += 1; // +1 XP за клик поглаживание
+        xp += 1;
         happiness = Math.min(100, happiness + 0.5);
 
         const neededXp = level * 100;
@@ -896,7 +902,7 @@ export const useGameState = () => {
           const newLevel = level;
           setTimeout(() => {
             addNotification('Новый уровень! 🌟', `${currentCatName} достиг уровня ${newLevel}! +75 лапок!`, 'success');
-            setProfile((p) => {
+            updateProfile((p) => {
               if (!p) return null;
               const newDiaryEntry: DiaryEntry = {
                 id: 'diary_' + Math.random().toString(36).substring(2, 11),
@@ -919,7 +925,6 @@ export const useGameState = () => {
         return { ...cat, xp, level, happiness };
       });
 
-      // Квест на клики
       const updatedQuests = prev.quests.map((q) => {
         if (q.type === 'click' && !q.completed) {
           const progress = Math.min(q.target, q.progress + 1);
@@ -944,16 +949,15 @@ export const useGameState = () => {
 
       return checkForNewAchievements(nextProfile);
     });
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
   // Лопнуть пупырку в Pop It
   const burstPopIt = useCallback(() => {
     if (!profile) return;
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       const count = (prev.popItBurstedCount || 0) + 1;
       
-      // Каждый 40-й взрыв дает лапку
       let bonus = 0;
       if (count % 40 === 0) {
         bonus = 1;
@@ -982,12 +986,12 @@ export const useGameState = () => {
       };
       return checkForNewAchievements(nextProfile);
     });
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
   // Кликнуть по клавиатуре
   const clickKeyboard = useCallback(() => {
     if (!profile) return;
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       const count = (prev.keyboardClicksCount || 0) + 1;
       
@@ -1003,13 +1007,13 @@ export const useGameState = () => {
         paws: prev.paws + bonus,
       };
     });
-  }, [profile, addNotification]);
+  }, [profile, addNotification, updateProfile]);
 
   // Забрать награду за квест
   const claimQuestReward = useCallback((questId: string) => {
     if (!profile) return;
 
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       const quest = prev.quests.find((q) => q.id === questId);
       if (!quest || !quest.completed || quest.claimed) return prev;
@@ -1027,13 +1031,12 @@ export const useGameState = () => {
       };
       return checkForNewAchievements(nextProfile);
     });
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
   // Покупка скина, аксессуара или расходного материала
   const purchaseSkinOrAccessory = useCallback((skinId: string) => {
     if (!profile) return;
 
-    // Сначала проверим, не расходник ли это
     const consumableItem = CONSUMABLE_ITEMS.find((c) => c.id === skinId);
     if (consumableItem) {
       if (profile.paws < consumableItem.cost) {
@@ -1041,7 +1044,7 @@ export const useGameState = () => {
         return;
       }
 
-      setProfile((prev) => {
+      updateProfile((prev) => {
         if (!prev) return null;
 
         setAnalytics((prevAnalytics) => {
@@ -1068,7 +1071,6 @@ export const useGameState = () => {
       return;
     }
 
-    // Иначе это скин или аксессуар
     const skinToBuy = ALL_SKINS_LIST.find((s) => s.id === skinId);
     if (!skinToBuy) return;
 
@@ -1077,7 +1079,7 @@ export const useGameState = () => {
       return;
     }
 
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       
       if (prev.unlockedSkins.includes(skinId)) {
@@ -1115,13 +1117,13 @@ export const useGameState = () => {
       };
       return checkForNewAchievements(nextProfile);
     });
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
   // Надеть скин или аксессуар
   const applySkinOrAccessory = useCallback((catId: string, skinId: string) => {
     if (!profile) return;
 
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
 
       const selectedSkin = ALL_SKINS_LIST.find((s) => s.id === skinId);
@@ -1160,7 +1162,7 @@ export const useGameState = () => {
         cats: updatedCats,
       };
     });
-  }, [profile, addNotification]);
+  }, [profile, addNotification, updateProfile]);
 
   // Приютить нового котенка
   const adoptNewCat = useCallback((catName: string, breed: string, skinId: string) => {
@@ -1199,7 +1201,7 @@ export const useGameState = () => {
       icon: '🍼'
     };
 
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       addNotification('Регистрация питомца! 🍼', `Котенок ${catName} официально стал частью семьи!`, 'success');
       
@@ -1212,12 +1214,12 @@ export const useGameState = () => {
       };
       return checkForNewAchievements(nextProfile);
     });
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
   // Смена активного котика
   const selectActiveCat = useCallback((catId: string) => {
     if (!profile) return;
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       const cat = prev.cats.find((c) => c.id === catId);
       if (cat) {
@@ -1228,12 +1230,12 @@ export const useGameState = () => {
         activeCatId: catId,
       };
     });
-  }, [profile, addNotification]);
+  }, [profile, addNotification, updateProfile]);
 
   // Пополнение баланса (донат)
   const addPaws = useCallback((amount: number, isDonation: boolean = false) => {
     if (!profile) return;
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       
       if (isDonation) {
@@ -1248,9 +1250,9 @@ export const useGameState = () => {
       };
       return checkForNewAchievements(nextProfile);
     });
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
-  // Забрать награду за отзыв (+100 лапок)
+  // Забрать награду за отзыв
   const claimReviewReward = useCallback(() => {
     if (!profile) return;
     if (profile.claimedReviewReward) {
@@ -1258,7 +1260,7 @@ export const useGameState = () => {
       return;
     }
 
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       addNotification('Бонус за отзыв! ⭐', 'Благодарим вас! Начислено +100 лапок!', 'success');
       
@@ -1269,12 +1271,12 @@ export const useGameState = () => {
       };
       return checkForNewAchievements(nextProfile);
     });
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
   // Смена обоев рабочего стола
   const updateWallpaper = useCallback((wallpaperId: string) => {
     if (!profile) return;
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       addNotification('Обои изменены 🖼️', 'Рабочий стол macOS успешно обновился.', 'info');
       return {
@@ -1282,9 +1284,9 @@ export const useGameState = () => {
         currentWallpaper: wallpaperId,
       };
     });
-  }, [profile, addNotification]);
+  }, [profile, addNotification, updateProfile]);
 
-  // Вспомогательная функция умного слияния прогресса (Smart Merge)
+  // Умное слияние профилей
   const smartMergeProfiles = useCallback((local: PlayerProfile, cloud: PlayerProfile): PlayerProfile => {
     const unlockedSkins = Array.from(new Set([...(local.unlockedSkins || []), ...(cloud.unlockedSkins || [])]));
     const unlockedBreeds = Array.from(new Set([...(local.unlockedBreeds || []), ...(cloud.unlockedBreeds || [])]));
@@ -1350,13 +1352,12 @@ export const useGameState = () => {
     };
   }, []);
 
-  // Активация промокода раз в неделю
+  // Активация промокода
   const redeemPromoCode = useCallback((code: string): { success: boolean; message: string } => {
     if (!profile) return { success: false, message: 'Профиль еще не загружен.' };
 
     const cleanCode = code.trim().toUpperCase();
     
-    // Лимит: раз в неделю (7 дней)
     const lastRedeemed = profile.lastPromoRedeemedTime || 0;
     const cooldown = 7 * 24 * 60 * 60 * 1000;
     const timeElapsed = Date.now() - lastRedeemed;
@@ -1391,7 +1392,7 @@ export const useGameState = () => {
       return { success: false, message: 'Неверный или устаревший промокод' };
     }
 
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       const updatedPromos = Array.from(new Set([...(prev.redeemedPromos || []), cleanCode]));
       const nextProfile = {
@@ -1405,73 +1406,72 @@ export const useGameState = () => {
     });
 
     return { success: true, message: `Успешно начислено +${awardPaws} лапок!` };
-  }, [profile, addNotification, checkForNewAchievements]);
+  }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
-  // Настоящее облачное сохранение Firestore с конфликтами
+  // ================== СИНХРОНИЗАЦИЯ ==================
   const triggerCloudSync = useCallback(async () => {
-    if (!profile) return;
+    const currentProfile = profileRef.current;
+    if (!currentProfile) return;
     
-    if (!isOnline || isOfflineMode) {
-      FirebaseLogger.log('warn', `Синхронизация отклонена: оффлайн-режим (isOfflineMode=${isOfflineMode}, isOnline=${isOnline})`);
-      addNotification('Сбой сети 🌐', 'В данный момент вы оффлайн. Прогресс сохранен в локальный кэш и синхронизируется при появлении связи.', 'warning');
+    // Двойная проверка: используем и isOnline, и navigator.onLine
+    const online = isOnline && navigator.onLine;
+    if (!online || isOfflineMode) {
+      FirebaseLogger.log('warn', `Синхронизация отклонена: оффлайн-режим (isOfflineMode=${isOfflineMode}, isOnline=${isOnline}, navigator.onLine=${navigator.onLine})`);
+      addNotification('Сбой сети 🌐', 'В данный момент вы оффлайн. Прогресс сохранен в локальный кэш.', 'warning');
       const timeStr = new Date().toLocaleTimeString();
-      setSyncLog(prev => [`[${timeStr}] ⚠️ Изменения сохранены в локальный оффлайн-буфер.`, ...prev]);
+      setSyncLog(prev => [`[${timeStr}] ⚠️ Оффлайн – синхронизация отложена.`, ...prev]);
       return;
     }
 
     setSyncing(true);
-    FirebaseLogger.log('info', `Начало синхронизации профиля ${profile.nickname} с Firestore...`);
+    FirebaseLogger.log('info', `Начало синхронизации профиля ${currentProfile.nickname} с Firestore...`);
     addNotification('Сохранение...', 'Подключение к Firebase Firestore...', 'info');
     const timeStr = new Date().toLocaleTimeString();
     setSyncLog(prev => [`[${timeStr}] 📡 Попытка подключения к Firestore...`, ...prev]);
 
     try {
-      const userRef = doc(db, 'users', profile.nickname);
+      const uid = localStorage.getItem('maccat_local_uid') || currentProfile.nickname;
+      const userRef = doc(db, 'users', uid);
       const docSnap = await getDoc(userRef);
 
       if (docSnap.exists()) {
         const cloudProfile = docSnap.data() as PlayerProfile;
         FirebaseLogger.log('info', `Профиль обнаружен на сервере Firestore. Сравнение параметров...`);
         
-        // Настоящий конфликт возникает ТОЛЬКО если прогресс в облаке по ключевым параметрам строго превосходит локальный,
-        // или если списки скинов расходятся так, что в облаке есть то, чего нет локально.
         const isConflict = 
-          (cloudProfile.paws > profile.paws) || 
-          (cloudProfile.cats.length > profile.cats.length) ||
+          (cloudProfile.paws > currentProfile.paws) || 
+          (cloudProfile.cats.length > currentProfile.cats.length) ||
           cloudProfile.cats.some(cc => {
-            const lc = profile.cats.find(cat => cat.id === cc.id);
-            if (!lc) return true; // в облаке есть котик, которого нет локально
-            if (cc.level > lc.level) return true; // в облаке котик более высокого уровня
-            if (cc.level === lc.level && cc.xp > lc.xp) return true; // в облаке больше XP при том же уровне
+            const lc = currentProfile.cats.find(cat => cat.id === cc.id);
+            if (!lc) return true;
+            if (cc.level > lc.level) return true;
+            if (cc.level === lc.level && cc.xp > lc.xp) return true;
             return false;
           }) ||
-          (cloudProfile.unlockedSkins && cloudProfile.unlockedSkins.some(s => !profile.unlockedSkins.includes(s)));
+          (cloudProfile.unlockedSkins && cloudProfile.unlockedSkins.some(s => !currentProfile.unlockedSkins.includes(s)));
 
         if (isConflict) {
-          FirebaseLogger.log('warn', `Обнаружен конфликт версий! Облачные paws=${cloudProfile.paws}, локальные paws=${profile.paws}.`);
+          FirebaseLogger.log('warn', `Обнаружен конфликт версий! Облачные paws=${cloudProfile.paws}, локальные paws=${currentProfile.paws}.`);
           setSyncing(false);
           const timeConflict = new Date().toLocaleTimeString();
           setSyncLog(prev => [`[${timeConflict}] ⚠️ Обнаружена рассинхронизация с сервером Firebase (другое устройство)!`, ...prev]);
           
-          // Запускаем окно выбора
           setConflictCloudData(cloudProfile);
-          setConflictLocalData(profile);
+          setConflictLocalData(currentProfile);
           setShowConflictModal(true);
           addNotification('Конфликт данных! ⚠️', 'Обнаружены разные сейвы в Firebase и на этом телефоне. Выберите действие.', 'warning');
           return;
         }
       }
 
-      // Если конфликтов нет - пишем в облако
       FirebaseLogger.log('info', `Конфликтов не обнаружено. Запись данных в Firestore...`);
       const now = Date.now();
       const updatedProfile = { 
-        ...profile, 
+        ...currentProfile, 
         lastSavedTime: now 
       };
 
       const cleanedProfile = { ...updatedProfile };
-      // Удаляем undefined значения перед записью в Firestore чтобы не падало
       Object.keys(cleanedProfile).forEach(key => {
         if ((cleanedProfile as any)[key] === undefined) {
           delete (cleanedProfile as any)[key];
@@ -1479,10 +1479,9 @@ export const useGameState = () => {
       });
 
       await setDoc(userRef, cleanedProfile, { merge: true });
-      FirebaseLogger.log('success', `Данные успешно записаны в Firestore для ${profile.nickname}!`);
+      FirebaseLogger.log('success', `Данные успешно записаны в Firestore для ${currentProfile.nickname}!`);
       
-      // Обновляем локальное состояние с новым lastSavedTime, чтобы оффлайн-упадок считался от этого момента
-      setProfile(updatedProfile);
+      updateProfile(() => updatedProfile);
       
       setSyncing(false);
       const timeOk = new Date().toLocaleTimeString();
@@ -1490,6 +1489,13 @@ export const useGameState = () => {
       setSyncLog(prev => [`[${timeOk}] ✅ Данные успешно записаны в облако Firestore. Базы идентичны.`, ...prev]);
       addNotification('Сохранено в iCloud! ☁️', 'Ваш прогресс в облаке успешно обновлен.', 'success');
     } catch (err: any) {
+      // Обработка ошибок: если это ошибка сети, не показываем как критическую
+      if (err.message?.includes('offline') || err.code === 'unavailable' || err.code === 'network-request-failed' || err.code === 'unauthenticated') {
+        FirebaseLogger.log('warn', `Синхронизация не удалась из-за проблем с сетью: ${err.message}`);
+        addNotification('Нет соединения 🌐', 'Попробуйте позже, когда появится интернет.', 'warning');
+        setSyncing(false);
+        return;
+      }
       FirebaseLogger.log('error', `Ошибка при синхронизации с Firestore: ${err?.message || err}`);
       console.error('Ошибка при синхронизации с Firestore:', err);
       setSyncing(false);
@@ -1497,18 +1503,17 @@ export const useGameState = () => {
       setSyncLog(prev => [`[${timeErr}] ❌ Ошибка соединения: ${err?.message || err}`, ...prev]);
       addNotification('Ошибка синхронизации ⚠️', 'Не удалось связаться с облаком Firebase.', 'error');
     }
-  }, [profile, isOnline, isOfflineMode, addNotification]);
+  }, [isOnline, isOfflineMode, addNotification, updateProfile]);
 
-  // Симуляция конфликта (вызывается из интерфейса для демонстрации)
+  // Симуляция конфликта
   const simulateConflictDeviceSwitch = useCallback(() => {
     if (!profile) return;
     
-    // Создаем альтернативный профиль в облаке
     const dummyCloud: PlayerProfile = {
       ...profile,
-      paws: profile.paws + 850, // Больше лапок
-      unlockedSkins: Array.from(new Set([...profile.unlockedSkins, 'galaxy_cat', 'bengal_leopard'])), // Разблокированы редкие скины
-      cats: profile.cats.map((c, i) => i === 0 ? { ...c, level: c.level + 2, xp: 50 } : c), // Кот вырос на 2 уровня
+      paws: profile.paws + 850,
+      unlockedSkins: Array.from(new Set([...profile.unlockedSkins, 'galaxy_cat', 'bengal_leopard'])),
+      cats: profile.cats.map((c, i) => i === 0 ? { ...c, level: c.level + 2, xp: 50 } : c),
     };
 
     localStorage.setItem('maccat_cloud_db', JSON.stringify(dummyCloud));
@@ -1517,7 +1522,7 @@ export const useGameState = () => {
     setSyncLog(prev => [`[${timeStr}] 📲 Симуляция: другое устройство записало в Firebase прогресс (+850 🐾, +2 уровня кота, Galaxy скины).`, ...prev]);
   }, [profile, addNotification]);
 
-  // Разрешение конфликтов - три пути
+  // Разрешение конфликтов
   const resolveConflict = useCallback((resolution: 'merge' | 'keep_local' | 'keep_cloud') => {
     if (!conflictLocalData || !conflictCloudData) return;
 
@@ -1534,7 +1539,7 @@ export const useGameState = () => {
       addNotification('Облако перезаписано! 💾', 'Локальный прогресс объявлен главным и выгружен в облако.', 'info');
     }
 
-    setProfile(finalProfile);
+    updateProfile(() => finalProfile);
     localStorage.setItem('maccat_profile', JSON.stringify(finalProfile));
     localStorage.setItem('maccat_cloud_db', JSON.stringify(finalProfile));
 
@@ -1545,13 +1550,13 @@ export const useGameState = () => {
     const timeStr = new Date().toLocaleTimeString();
     setLastSyncedTime(timeStr);
     setSyncLog(prev => [`[${timeStr}] ✅ Конфликт успешно разрешен методом: [${resolution === 'merge' ? 'Умное Слияние' : resolution === 'keep_cloud' ? 'Приоритет Облака' : 'Приоритет Устройства'}].`, ...prev]);
-  }, [conflictLocalData, conflictCloudData, smartMergeProfiles, addNotification]);
+  }, [conflictLocalData, conflictCloudData, smartMergeProfiles, addNotification, updateProfile]);
 
   // Претендовать на награду за серию дней заботы
   const claimStreakMilestone = useCallback((milestoneId: string) => {
     if (!profile) return;
     
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       
       const claimed = prev.claimedStreakMilestones || [];
@@ -1599,15 +1604,14 @@ export const useGameState = () => {
         diary: [newEntry, ...(prev.diary || [])]
       };
 
-      localStorage.setItem('maccat_profile', JSON.stringify(next));
       return next;
     });
-  }, [profile, addNotification]);
+  }, [profile, addNotification, updateProfile]);
 
   // Обновить никнейм
   const updateNickname = useCallback((name: string) => {
     if (!profile) return;
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       addNotification('Настройки изменены ⚙️', `Ваше имя изменено на ${name}.`, 'info');
       return {
@@ -1615,12 +1619,12 @@ export const useGameState = () => {
         nickname: name,
       };
     });
-  }, [profile, addNotification]);
+  }, [profile, addNotification, updateProfile]);
 
   // Обновить тему оформления
   const updateThemePref = useCallback((theme: 'light' | 'dark' | 'auto') => {
     if (!profile) return;
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       addNotification('Оформление 🌗', `Тема переключена в режим: ${theme === 'dark' ? 'Темная' : theme === 'light' ? 'Светлая' : 'Автоматически'}.`, 'info');
       return {
@@ -1628,22 +1632,11 @@ export const useGameState = () => {
         theme,
       };
     });
-  }, [profile, addNotification]);
+  }, [profile, addNotification, updateProfile]);
 
-  // Автоматическая фоновая синхронизация с Firebase каждые 2 минуты
-  useEffect(() => {
-    if (!profile) return;
-    const syncInterval = setInterval(() => {
-      if (isOnline && !isOfflineMode && !showConflictModal) {
-        triggerCloudSync();
-      }
-    }, 120000); // 120000 мс = 2 минуты
-
-    return () => clearInterval(syncInterval);
-  }, [profile, isOnline, isOfflineMode, showConflictModal, triggerCloudSync]);
-
+  // Добавить запись в дневник
   const addDiaryEntry = useCallback((type: 'adopt' | 'level_up' | 'skin_unlocked' | 'rare_catch' | 'achievement', title: string, description: string, icon: string) => {
-    setProfile((prev) => {
+    updateProfile((prev) => {
       if (!prev) return null;
       const newEntry: DiaryEntry = {
         id: 'diary_' + Math.random().toString(36).substring(2, 11),
@@ -1659,8 +1652,9 @@ export const useGameState = () => {
         diary: [newEntry, ...(prev.diary || [])]
       };
     });
-  }, []);
+  }, [updateProfile]);
 
+  // ================== ВОЗВРАЩАЕМЫЙ ОБЪЕКТ ==================
   return {
     profile,
     notifications,

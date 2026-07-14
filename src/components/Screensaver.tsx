@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Cat } from '../types';
-import { CatRenderer } from './CatRenderer';
+import { NeedsCatRenderer } from './NeedsCatRenderer';
 
 interface ScreensaverProps {
   onDismiss: () => void;
@@ -91,15 +91,18 @@ export const Screensaver: React.FC<ScreensaverProps> = ({
         {/* Кот (активный) */}
         {catToShow && activeSkin ? (
           <div className="bg-neutral-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-sm shadow-xl">
-            <CatRenderer
+            <NeedsCatRenderer
+              status={catToShow.status}
+              hunger={catToShow.hunger}
+              happiness={catToShow.happiness}
+              cleanliness={catToShow.cleanliness}
+              energy={catToShow.energy}
               breed={catToShow.breed}
               color={activeSkin.color}
               patternColor={activeSkin.patternColor}
               eyeColor={activeSkin.eyeColor}
               accessory={(catToShow as any).accessory}
-              status={catToShow.status}
               size={140}
-              personality={catToShow.personality}
             />
           </div>
         ) : (

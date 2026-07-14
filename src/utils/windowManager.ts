@@ -24,14 +24,13 @@ export function getWindowLayout(
   const isMobile = screenWidth < 768;
 
   if (isMobile) {
-    // На телефонах окно занимает почти весь экран, но не перекрывает меню и док
+    // На телефонах окно занимает ВСЁ доступное пространство под меню, перекрывая док для удобства
     const topOffset = 36;  // высота меню
-    const bottomOffset = 72; // высота дока с отступами
     return {
       width: '100%',
-      height: screenHeight - topOffset - bottomOffset,
+      height: screenHeight - topOffset,
       top: topOffset,
-      bottom: bottomOffset,
+      bottom: 0,
       left: 0,
     };
   }

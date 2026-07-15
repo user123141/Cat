@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CatRenderer } from './CatRenderer';
-import { Sparkles, User, Award, ArrowRight } from 'lucide-react';
+import { Sparkles, User, Award, ArrowRight, ArrowLeft, Upload } from 'lucide-react';
 
 interface OnboardingProps {
   onCreateProfile: (nickname: string, initialCatName: string, breed: string, skinId: string) => void;
@@ -20,6 +20,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onCreateProfile }) => {
   const [catName, setCatName] = useState('');
   const [selectedBreedIdx, setSelectedBreedIdx] = useState(0);
   const [step, setStep] = useState(1);
+  const [showImport, setShowImport] = useState(false);
+  const [importCode, setImportCode] = useState('');
+  const [importError, setImportError] = useState('');
 
   const activeBreed = BREEDS[selectedBreedIdx];
 
@@ -37,6 +40,23 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onCreateProfile }) => {
         activeBreed.id,
         activeBreed.defaultSkin
       );
+    }
+  };
+
+  const handleImport = () => {
+    try {
+      setImportError('');
+      if (!importCode.trim()) return;
+      const jsonStr = decodeURIComponent(escape(atob(importCode.trim())));
+      const parsed = JSON.parse(jsonStr);
+      if (parsed && typeof parsed === 'object' && parsed.nickname && Array.isArray(parsed.cats)) {
+        localStorage.setItem('maccat_profile', jsonStr);
+        window.location.reload();
+      } else {
+        setImportError('Неверный формат резервного ключа!');
+      }
+    } catch (e) {
+      setImportError('Не удалось распознать код. Пожалуйста, скопируйте его полностью.');
     }
   };
 
@@ -59,45 +79,107 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onCreateProfile }) => {
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
             className="w-full max-w-[420px] rounded-[32px] glass-panel-dark p-6 md:p-8 text-center space-y-6 relative border border-white/10 shadow-2xl"
           >
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-sky-500/10 border border-sky-400/20 rounded-full text-xs font-bold text-sky-400 uppercase tracking-wider">
-                <Sparkles size={12} className="animate-pulse" />
-                <span>MacCat Care OS</span>
-              </div>
-              <h1 className="text-2xl font-black text-white tracking-tight leading-none font-display">
-                Добро пожаловать
-              </h1>
-              <p className="text-xs text-slate-400 leading-relaxed px-2">
-                Погрузитесь в изящную симуляцию заботы о котятах, оформленную в премиальном стиле Apple Minimalist с плавными макосовскими микро-анимациями.
-              </p>
-            </div>
+            {!showImport ? (
+              <>
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-sky-500/10 border border-sky-400/20 rounded-full text-xs font-bold text-sky-400 uppercase tracking-wider">
+                    <Sparkles size={12} className="animate-pulse" />
+                    <span>MacCat Care OS</span>
+                  </div>
+                  <h1 className="text-2xl font-black text-white tracking-tight leading-none font-display">
+                    Добро пожаловать
+                  </h1>
+                  <p className="text-xs text-slate-400 leading-relaxed px-2">
+                    Погрузитесь в изящную симуляцию заботы о котятах, оформленную в премиальном стиле Apple Minimalist с плавными макосовскими микро-анимациями.
+                  </p>
+                </div>
 
-            {/* Input field */}
-            <div className="space-y-4">
-              <div className="text-left space-y-1.5">
-                <label className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
-                  <User size={12} />
-                  Как вас называть?
-                </label>
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  maxLength={14}
-                  placeholder="Введите никнейм"
-                  className="w-full px-4 py-3 rounded-2xl bg-black/45 border border-white/10 text-white font-bold text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all text-center placeholder:text-slate-600 font-sans"
-                />
-              </div>
+                {/* Input field */}
+                <div className="space-y-4">
+                  <div className="text-left space-y-1.5">
+                    <label className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <User size={12} />
+                      Как вас называть?
+                    </label>
+                    <input
+                      type="text"
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value)}
+                      maxLength={14}
+                      placeholder="Введите никнейм"
+                      className="w-full px-4 py-3 rounded-2xl bg-black/45 border border-white/10 text-white font-bold text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all text-center placeholder:text-slate-600 font-sans"
+                    />
+                  </div>
 
-              <button
-                onClick={handleNext}
-                disabled={nickname.trim().length < 2}
-                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs tracking-wider uppercase transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-sky-500/15"
-              >
-                <span>Начать путешествие</span>
-                <ArrowRight size={13} />
-              </button>
-            </div>
+                  <button
+                    onClick={handleNext}
+                    disabled={nickname.trim().length < 2}
+                    className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs tracking-wider uppercase transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-sky-500/15"
+                  >
+                    <span>Начать путешествие</span>
+                    <ArrowRight size={13} />
+                  </button>
+
+                  <button
+                    onClick={() => setShowImport(true)}
+                    className="w-full text-center text-xs font-bold text-sky-400 hover:text-sky-300 transition-colors mt-2 cursor-pointer bg-transparent border-none outline-none"
+                  >
+                    Уже играли? Импортировать прогресс 📥
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-400/20 rounded-full text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                    <Upload size={12} />
+                    <span>Синхронизация прогресса</span>
+                  </div>
+                  <h1 className="text-2xl font-black text-white tracking-tight leading-none font-display">
+                    Импорт прогресса
+                  </h1>
+                  <p className="text-xs text-slate-400 leading-relaxed px-2">
+                    Вставьте ваш скопированный 100% код сохранения/экспорта ниже, чтобы восстановить весь ваш игровой процесс Care OS.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="text-left space-y-1.5">
+                    <textarea
+                      value={importCode}
+                      onChange={(e) => setImportCode(e.target.value)}
+                      placeholder="Вставьте буквенный код сохранения сюда..."
+                      className="w-full h-24 px-3 py-2 text-xs font-mono rounded-xl bg-black/45 border border-white/10 text-slate-300 focus:outline-none focus:border-emerald-500 transition-all resize-none"
+                    />
+                    {importError && (
+                      <p className="text-rose-400 text-[10px] font-bold text-left">{importError}</p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setShowImport(false);
+                        setImportError('');
+                      }}
+                      className="flex-1 py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold text-xs tracking-wider uppercase transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <ArrowLeft size={13} />
+                      <span>Назад</span>
+                    </button>
+
+                    <button
+                      onClick={handleImport}
+                      disabled={!importCode.trim()}
+                      className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs tracking-wider uppercase transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/15"
+                    >
+                      <Upload size={13} />
+                      <span>Импорт</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </motion.div>
         ) : (
           // Step 2: Choose first kitten card

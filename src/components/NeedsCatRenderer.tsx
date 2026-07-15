@@ -147,34 +147,24 @@ export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = ({
   };
 
   if (isSleeping) {
-    return (
-      <div style={{ width: size, height: size }} className="relative flex items-center justify-center animate-pulse">
-        <div className="absolute top-1 right-2 flex flex-col text-[8px] font-bold text-sky-400 select-none">
-          <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>Z</span>
-          <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>z</span>
-        </div>
-        <svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="50" cy="85" rx="30" ry="6" fill="rgba(0,0,0,0.12)" />
-          <path d="M25 75C20 65 25 50 50 50C75 50 80 65 75 75C70 82 30 82 25 75Z" fill={color} />
-          <circle cx="42" cy="58" r="16" fill={color} />
-          <path d="M75 72C82 68 85 55 80 48" stroke={color} strokeWidth="6" strokeLinecap="round" />
-          <path d="M28 48L18 36L34 46Z" fill={color} />
-          <path d="M50 48L58 35L44 45Z" fill={color} />
-          <path d="M32 58C34 60 36 60 38 58" stroke="rgba(0,0,0,0.5)" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M46 58C48 60 50 60 52 58" stroke="rgba(0,0,0,0.5)" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M41 62L43 62L42 63.5Z" fill="#fda4af" stroke="#f43f5e" strokeWidth="0.5" />
-          <path d="M40 66C41 67 43 67 44 66" stroke="rgba(0,0,0,0.4)" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      </div>
-    );
+    // We no longer return a completely different, accessory-less static cat.
+    // Instead, we let the unified renderer below handle the sleeping state with closed eyes,
+    // so accessories, breeds, custom colors, and markings are perfectly preserved!
   }
 
   return (
-    <div style={{ width: size, height: size }} className="relative flex items-center justify-center">
-      {isSad && (
+    <div style={{ width: size, height: size }} className={`relative flex items-center justify-center ${isSleeping ? 'animate-pulse' : ''}`}>
+      {isSad && !isSleeping && (
         <span className="absolute top-0.5 left-0.5 text-[9px] animate-bounce">
           {isDirty ? '🧼' : isHungry ? '🍗' : '💔'}
         </span>
+      )}
+      {isSleeping && (
+        <div className="absolute top-1 right-2 flex flex-col text-[8px] font-bold text-sky-400 select-none z-20">
+          <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>Z</span>
+          <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>z</span>
+          <span className="animate-bounce" style={{ animationDelay: '0.7s' }}>z</span>
+        </div>
       )}
 
       <svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -217,7 +207,7 @@ export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = ({
           }}
         />
 
-        {activity === 'blinking' ? (
+        {isSleeping || activity === 'blinking' ? (
           <>
             <path d="M37 36C39 37.5 41 37.5 43 36" stroke="rgba(0,0,0,0.7)" strokeWidth="2.5" strokeLinecap="round" />
             <path d="M57 36C59 37.5 61 37.5 63 36" stroke="rgba(0,0,0,0.7)" strokeWidth="2.5" strokeLinecap="round" />

@@ -76,6 +76,16 @@ const getAccessorySlot = (acc: string | undefined): { slot: 'hat' | 'glasses' | 
   return { slot: null, value: undefined };
 };
 
+// Вспомогательная функция для надежного извлечения слота продукта, в приоритете из объекта Skin
+const getProductSlot = (product: ShopProduct): 'hat' | 'glasses' | 'collar' | 'scarf' | 'boots' | 'wings' | null => {
+  if (product.category !== 'accessories') return null;
+  const skin = product.originalItem as Skin;
+  if (skin.slot) return skin.slot;
+  const acc = skin.accessory;
+  const { slot } = getAccessorySlot(acc);
+  return slot;
+};
+
 export const ShopWindow: React.FC<ShopWindowProps> = ({
   profile,
   activeCat,
@@ -228,7 +238,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
     if (!activeCat) return false;
     if (product.category === 'accessories') {
       const acc = (product.originalItem as Skin).accessory;
-      const { slot } = getAccessorySlot(acc);
+      const slot = getProductSlot(product);
       if (slot === 'hat') return activeCat.hat === acc;
       if (slot === 'glasses') return activeCat.glasses === acc;
       if (slot === 'collar') return activeCat.collar === acc;
@@ -256,7 +266,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
 
   const filteredProducts = shopProducts.filter(p => p.category === activeTab);
 
-  const groupedProducts = useMemo(() => {
+  const groupedProducts = useMemo<Record<string, ShopProduct[]>>(() => {
     const groups: Record<string, ShopProduct[]> = {};
     filteredProducts.forEach(p => {
       const sub = p.subcategory || 'Общие';
@@ -331,7 +341,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
         <div className="flex-1 overflow-y-auto p-3 md:p-5 bg-slate-950/30">
           {activeTab !== 'topup' ? (
             <div className="space-y-6">
-              {Object.entries(groupedProducts).map(([subcategory, products]) => (
+              {(Object.entries(groupedProducts) as [string, ShopProduct[]][]).map(([subcategory, products]) => (
                 <div key={subcategory}>
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-white/5 pb-1.5 mb-2 flex items-center gap-1.5">
                     <Sparkle size={10} className="text-sky-400" />
@@ -348,7 +358,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                       let accessoryProps = {};
                       if (product.category === 'accessories') {
                         const acc = (product.originalItem as Skin).accessory;
-                        const { slot } = getAccessorySlot(acc);
+                        const slot = getProductSlot(product);
                         if (slot) {
                           accessoryProps = { [slot]: acc };
                         } else {
@@ -486,7 +496,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                       };
                       if (selectedProduct.category === 'accessories') {
                         const acc = (selectedProduct.originalItem as Skin).accessory;
-                        const { slot } = getAccessorySlot(acc);
+                        const slot = getProductSlot(selectedProduct);
                         if (slot) {
                           modalProps = { ...modalProps, [slot]: acc };
                         } else {
@@ -514,14 +524,13 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                   <div className="text-[10px] text-slate-300 mb-2">
                     Слот: <span className="font-bold text-sky-400">
                       {(() => {
-                        const acc = (selectedProduct.originalItem as Skin).accessory;
-                        const lower = acc?.toLowerCase() || '';
-                        if (lower.includes('hat') || lower.includes('crown') || lower.includes('halo') || lower.includes('cap') || lower.includes('shlyapa') || lower.includes('kolpak')) return 'Головной убор';
-                        if (lower.includes('glasses') || lower.includes('headphones') || lower.includes('ochki') || lower.includes('naushniki')) return 'Очки/Наушники';
-                        if (lower.includes('collar') || lower.includes('bell') || lower.includes('ribbon') || lower.includes('bow') || lower.includes('osheynik') || lower.includes('bantik')) return 'Ошейник/Бантик';
-                        if (lower.includes('scarf') || lower.includes('sharf')) return 'Шарф';
-                        if (lower.includes('boots') || lower.includes('slippers') || lower.includes('tapochki') || lower.includes('sapozhki')) return 'Обувь';
-                        if (lower.includes('wings') || lower.includes('krylya')) return 'Крылья';
+                        const slot = getProductSlot(selectedProduct);
+                        if (slot === 'hat') return 'Головной убор';
+                        if (slot === 'glasses') return 'Очки/Наушники';
+                        if (slot === 'collar') return 'Ошейник/Бантик';
+                        if (slot === 'scarf') return 'Шарф';
+                        if (slot === 'boots') return 'Обувь';
+                        if (slot === 'wings') return 'Крылья';
                         return 'Аксессуар';
                       })()}
                     </span>
@@ -537,15 +546,19 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
 
                 <button
                   onClick={handleModalAction}
-                  disabled={profile.paws < selectedProduct.cost && !isProductOwned(selectedProduct)}
+                  disabled={
+                    selectedProduct.category === 'food' || selectedProduct.category === 'hygiene'
+                      ? profile.paws < selectedProduct.cost
+                      : profile.paws < selectedProduct.cost && !isProductOwned(selectedProduct)
+                  }
                   className="w-full py-3 rounded-xl text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {selectedProduct.category === 'food' || selectedProduct.category === 'hygiene' ? (
-                    isProductOwned(selectedProduct) ? 'Использовать' : 'Купить'
+                    `Купить еще (🐾 ${selectedProduct.cost})`
                   ) : isProductOwned(selectedProduct) ? (
                     isProductEquipped(selectedProduct) ? 'Снять' : 'Надеть'
                   ) : (
-                    'Купить'
+                    `Купить (🐾 ${selectedProduct.cost})`
                   )}
                 </button>
               </div>

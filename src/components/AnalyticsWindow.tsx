@@ -157,7 +157,7 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
             }`}
           >
             <Award size={12} className="text-rose-400" />
-            <span>🏆 Топ владельцев</span>
+            <span>🏆 Топ игроков</span>
           </button>
         </div>
         <div className="text-[10px] font-mono text-slate-500 max-sm:hidden">
@@ -382,7 +382,7 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
                   👑 Мировой рейтинг приютов Care OS
                 </h3>
                 <p className="text-[10px] text-slate-400 leading-relaxed">
-                  Повышайте уровни котиков, кормите, играйте и накапливайте ценные лапки 🐾, чтобы войти в элитный зал славы владельцев.
+                  Повышайте уровни котиков, кормите, играйте и накапливайте ценные лапки 🐾, чтобы войти в элитный зал славы игроков.
                 </p>
               </div>
 

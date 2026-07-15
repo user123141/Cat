@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useGameState } from './hooks/useGameState';
-import { FirebaseLogger } from './utils/FirebaseLogger';
+import { GameLogger } from './utils/GameLogger';
 import { MenuBar } from './components/MenuBar';
 import { DynamicIsland } from './components/DynamicIsland';
 import { SwiftUIWidgets } from './components/SwiftUIWidgets';
@@ -22,9 +22,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { playWindowOpenSound, playWindowCloseSound, setSoundsMuted, triggerHaptic } from './utils/audio';
 import { useWindowManager, WindowId } from './context/WindowManagerContext';
-import { initAuth } from './firebase';
-import { db } from './firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { supabase } from './supabase';
 import { PlayerProfile, Skin } from './types';
 
 const ADMIN_PASSWORD = '1111';
@@ -133,14 +131,6 @@ export default function App() {
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    initAuth().then((uid) => {
-      if (uid) {
-        FirebaseLogger.log('info', `App: пользователь авторизован ${uid}`);
-      } else {
-        FirebaseLogger.log('warn', 'App: аутентификация не удалась, продолжаем в офлайн-режиме');
-      }
-    });
-
     // Запрос разрешения на уведомления при первом запуске
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().then(perm => {
@@ -153,8 +143,12 @@ export default function App() {
 
   const fetchUsersList = useCallback(async () => {
     try {
-      const snapshot = await getDocs(collection(db, 'users'));
-      setUsersList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      if (!supabase) return;
+      const { data, error } = await supabase
+        .from('player_profiles')
+        .select('*');
+      if (error) throw error;
+      setUsersList((data || []).map(row => ({ id: row.id, ...row.profile_data, nickname: row.profile_data?.nickname || row.id })));
     } catch (e) {
       console.error('Ошибка загрузки пользователей:', e);
     }
@@ -166,7 +160,7 @@ export default function App() {
       if (isOnline && !isOfflineMode && !showConflictModal) {
         originalTriggerCloudSync();
       }
-    }, 120000);
+    }, 60000);
     return () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
@@ -275,7 +269,7 @@ export default function App() {
   const activeCat = profile?.cats?.find(c => c.id === profile.activeCatId);
 
   const handleManualSync = useCallback(async () => {
-    FirebaseLogger.log('info', 'Ручная синхронизация запущена из меню настроек App.tsx');
+    GameLogger.log('info', 'Ручная синхронизация запущена из меню настроек App.tsx');
     await originalTriggerCloudSync();
     if (isAdminMode) {
       await fetchUsersList();
@@ -294,6 +288,48 @@ export default function App() {
 
   if (!profile) {
     return <Onboarding onCreateProfile={createProfile} />;
+  }
+
+  // Check if user is blocked and if ban has expired
+  const isBanActive = (() => {
+    if (!profile?.blocked) return false;
+    if (profile.blockedUntil === -1) return true; // permanent
+    if (profile.blockedUntil && Date.now() < profile.blockedUntil) {
+      return true; // ban is still active
+    }
+    return false; // ban expired
+  })();
+
+  if (profile && isBanActive) {
+    const banDateStr = profile.blockedUntil === -1 ? 'Перманентно ♾️' : new Date(profile.blockedUntil).toLocaleString('ru-RU');
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center select-none z-[9999] font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-red-500/30 p-8 rounded-3xl shadow-2xl space-y-6">
+          <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-4xl animate-pulse">
+            🚫
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-extrabold text-white tracking-tight">Ваш аккаунт заблокирован</h1>
+            <p className="text-sm text-slate-400">Администрация Care OS ограничила доступ к вашей учетной записи.</p>
+          </div>
+          
+          <div className="bg-black/30 border border-white/5 rounded-2xl p-4 text-left space-y-2.5">
+            <div>
+              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Причина блокировки</span>
+              <p className="text-sm text-slate-200 font-medium">{profile.blockedReason || 'Нарушение правил игры или использование стороннего ПО'}</p>
+            </div>
+            <div className="border-t border-white/5 pt-2">
+              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Блокировка действует до</span>
+              <p className="text-sm text-rose-400 font-bold">{banDateStr}</p>
+            </div>
+          </div>
+          
+          <p className="text-xs text-slate-500 leading-normal">
+            Если вы считаете, что блокировка была выдана ошибочно, пожалуйста, обратитесь к администратору игры.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -455,11 +491,48 @@ export default function App() {
           onClose={handleAdminLogout}
           onUpdateUsers={fetchUsersList}
           currentUser={profile}
-          onBlockUser={async (uid) => { await updateDoc(doc(db, 'users', uid), { blocked: true }); fetchUsersList(); }}
-          onUnblockUser={async (uid) => { await updateDoc(doc(db, 'users', uid), { blocked: false }); fetchUsersList(); }}
-          onDeleteUser={async (uid) => { await deleteDoc(doc(db, 'users', uid)); fetchUsersList(); }}
-          onMakeAdmin={async (uid) => { await updateDoc(doc(db, 'users', uid), { isAdmin: true }); fetchUsersList(); }}
-          onChangeBalance={async (uid, amount) => { await updateDoc(doc(db, 'users', uid), { paws: amount }); fetchUsersList(); }}
+          onBlockUser={async (uid, reason, durationMinutes) => {
+            if (!supabase) return;
+            const u = usersList.find(x => x.id === uid);
+            if (!u) return;
+            const blockedUntil = durationMinutes === -1 ? -1 : Date.now() + durationMinutes * 60 * 1000;
+            const updated = { ...u, blocked: true, blockedReason: reason, blockedUntil: blockedUntil };
+            delete updated.id;
+            await supabase.from('player_profiles').update({ profile_data: updated }).eq('id', uid);
+            fetchUsersList();
+          }}
+          onUnblockUser={async (uid) => {
+            if (!supabase) return;
+            const u = usersList.find(x => x.id === uid);
+            if (!u) return;
+            const updated = { ...u, blocked: false };
+            delete updated.id;
+            await supabase.from('player_profiles').update({ profile_data: updated }).eq('id', uid);
+            fetchUsersList();
+          }}
+          onDeleteUser={async (uid) => {
+            if (!supabase) return;
+            await supabase.from('player_profiles').delete().eq('id', uid);
+            fetchUsersList();
+          }}
+          onMakeAdmin={async (uid) => {
+            if (!supabase) return;
+            const u = usersList.find(x => x.id === uid);
+            if (!u) return;
+            const updated = { ...u, isAdmin: true };
+            delete updated.id;
+            await supabase.from('player_profiles').update({ profile_data: updated }).eq('id', uid);
+            fetchUsersList();
+          }}
+          onChangeBalance={async (uid, amount) => {
+            if (!supabase) return;
+            const u = usersList.find(x => x.id === uid);
+            if (!u) return;
+            const updated = { ...u, paws: amount };
+            delete updated.id;
+            await supabase.from('player_profiles').update({ profile_data: updated }).eq('id', uid);
+            fetchUsersList();
+          }}
         />
       )}
 
@@ -512,18 +585,18 @@ export default function App() {
             <div className="text-center space-y-1.5">
               <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-2xl animate-bounce">⚠️</div>
               <h2 className="text-lg font-bold text-white">Разрешение конфликта синхронизации</h2>
-              <p className="text-xs text-slate-400">Обнаружена рассинхронизация с сервером Firebase. Вероятно, вы играли с другого устройства. Пожалуйста, выберите способ слияния.</p>
+              <p className="text-xs text-slate-400">Обнаружена рассинхронизация прогресса. Вероятно, вы играли с другого устройства. Пожалуйста, выберите способ слияния.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-3.5 bg-white/5 border border-white/5 rounded-2xl space-y-1 text-left">
-                <span className="text-[9px] font-mono font-bold text-sky-400 uppercase tracking-wider">Это Устройство (Локально)</span>
+                <span className="text-[9px] font-mono font-bold text-sky-400 uppercase tracking-wider">Это Устройство</span>
                 <div className="text-sm font-bold text-white">{conflictLocalData.nickname}</div>
                 <div className="text-xs text-slate-300">Баланс: <span className="font-bold text-sky-400">🐾 {conflictLocalData.paws}</span></div>
                 <div className="text-xs text-slate-300">Котов: <span className="font-bold">{conflictLocalData.cats.length}</span></div>
                 <div className="text-xs text-slate-300">Скинов: <span className="font-bold">{conflictLocalData.unlockedSkins.length}</span></div>
               </div>
               <div className="p-3.5 bg-sky-500/10 border border-sky-500/20 rounded-2xl space-y-1 text-left">
-                <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Облако Firebase</span>
+                <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Резервная копия</span>
                 <div className="text-sm font-bold text-white">{conflictCloudData.nickname}</div>
                 <div className="text-xs text-slate-300">Баланс: <span className="font-bold text-emerald-400">🐾 {conflictCloudData.paws}</span></div>
                 <div className="text-xs text-slate-300">Котов: <span className="font-bold">{conflictCloudData.cats.length}</span></div>
@@ -536,8 +609,8 @@ export default function App() {
                 <span className="text-[9px] font-normal opacity-90">Объединит скины, котов и выберет максимальный баланс и уровни</span>
               </button>
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => resolveConflict('keep_local')} className="py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] active:scale-95 transition-all cursor-pointer">💻 Оставить Локальное</button>
-                <button onClick={() => resolveConflict('keep_cloud')} className="py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] active:scale-95 transition-all cursor-pointer">☁️ Оставить из Облака</button>
+                <button onClick={() => resolveConflict('local')} className="py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] active:scale-95 transition-all cursor-pointer">💻 Оставить Локальное</button>
+                <button onClick={() => resolveConflict('cloud')} className="py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] active:scale-95 transition-all cursor-pointer">☁️ Восстановить из Копии</button>
               </div>
             </div>
           </div>

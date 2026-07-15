@@ -24,7 +24,8 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
   onMinimize,
 }) => {
   const [nicknameInput, setNicknameInput] = useState(profile?.nickname || '');
-  const [saveCode, setSaveCode] = useState('');
+  const [exportCode, setExportCode] = useState('');
+  const [importCodeInput, setImportCodeInput] = useState('');
   const [copied, setCopied] = useState(false);
   const [pastedStatus, setPastedStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -81,7 +82,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
     try {
       const dataStr = JSON.stringify(profile);
       const b64 = btoa(unescape(encodeURIComponent(dataStr)));
-      setSaveCode(b64);
+      setExportCode(b64);
       navigator.clipboard.writeText(b64);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -92,8 +93,8 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
 
   const handleImportSave = () => {
     try {
-      if (!saveCode.trim()) return;
-      const jsonStr = decodeURIComponent(escape(atob(saveCode.trim())));
+      if (!importCodeInput.trim()) return;
+      const jsonStr = decodeURIComponent(escape(atob(importCodeInput.trim())));
       const parsed = JSON.parse(jsonStr);
       if (parsed && typeof parsed === 'object' && parsed.nickname && Array.isArray(parsed.cats)) {
         localStorage.setItem('maccat_profile', jsonStr);
@@ -252,43 +253,89 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           </div>
         )}
 
-        {/* Резервные ключи переноса */}
-        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
+        {/* Временный блок переноса прогресса на новый сайт */}
+        <div className="bg-gradient-to-r from-sky-500/10 to-indigo-500/10 border border-sky-500/30 rounded-2xl p-4 space-y-3 relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-24 h-24 bg-sky-500/10 rounded-full blur-xl pointer-events-none" />
+          <div className="space-y-1">
+            <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+              🚚 ПЕРЕЕЗД НА НОВЫЙ САЙТ (ПЕРЕНЕСТИ ПРОГРЕСС)
+            </h4>
+            <p className="text-[10px] text-slate-300 leading-relaxed text-left">
+              Мы переносим симуляцию на новый постоянный адрес! Нажмите на кнопку ниже: ваш игровой прогресс на 100% скопируется в буфер обмена, и вы автоматически перейдете на новый сайт, где сможете мгновенно продолжить игру.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              try {
+                const dataStr = JSON.stringify(profile);
+                const b64 = btoa(unescape(encodeURIComponent(dataStr)));
+                navigator.clipboard.writeText(b64);
+                alert("✅ Код сохранения успешно скопирован в буфер обмена (100% экспорт)!\n\nСейчас вы будете перенаправлены на новый адрес: https://cat-orpin-nine.vercel.app/\n\nТам нажмите кнопку 'Уже играли? Импортировать прогресс' и просто вставьте ваш код!");
+                window.location.href = "https://cat-orpin-nine.vercel.app/";
+              } catch (e) {
+                console.error(e);
+                alert("Ошибка копирования прогресса.");
+              }
+            }}
+            className="w-full py-2.5 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all active:scale-95 cursor-pointer bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2"
+          >
+            ✈️ Скопировать прогресс и перейти на новый сайт
+          </button>
+        </div>
+
+        {/* Перенос прогресса и резервные копии */}
+        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-4">
           <div className="space-y-0.5">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles size={14} className="text-sky-400" />
-              Резервные Ключи Переноса
+              Резервное копирование и перенос
             </h3>
             <p className="text-[10px] text-slate-400 leading-normal">
-              Помимо автосохранений Firebase, вы можете экспортировать буквенные ключи для ручного переноса прогресса.
+              Вы можете сохранить прогресс вручную или перенести его на другое устройство с помощью текстовых кодов.
             </p>
           </div>
-          <div className="flex flex-col gap-2">
-            <input
-              type="text"
-              value={saveCode}
-              onChange={(e) => setSaveCode(e.target.value)}
-              placeholder="Вставьте код сохранения"
-              className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-black/35 border border-white/10 text-slate-300 focus:outline-none focus:border-sky-500 transition-all"
-            />
+
+          {/* Экспорт */}
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Экспорт прогресса (Скопировать код)</label>
             <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={exportCode}
+                placeholder="Нажмите 'Создать код', чтобы экспортировать"
+                className="flex-1 px-3 py-1.5 text-xs font-mono rounded-xl bg-black/35 border border-white/10 text-slate-300 focus:outline-none"
+              />
               <button
                 onClick={handleExportSave}
-                className="flex-1 py-2 text-xs font-bold rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all cursor-pointer"
+                className="px-4 py-1.5 text-xs font-bold rounded-xl bg-sky-500 hover:bg-sky-600 text-white transition-all cursor-pointer whitespace-nowrap"
               >
-                {copied ? 'Готово!' : 'Экспорт'}
+                {copied ? 'Скопировано! ✅' : 'Создать и скопировать'}
               </button>
+            </div>
+          </div>
+
+          {/* Импорт */}
+          <div className="space-y-1.5 pt-2 border-t border-white/5">
+            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Импорт прогресса (Вставить код)</label>
+            <div className="flex flex-col gap-2">
+              <textarea
+                value={importCodeInput}
+                onChange={(e) => setImportCodeInput(e.target.value)}
+                placeholder="Вставьте скопированный ранее код сохранения сюда..."
+                className="w-full h-16 px-3 py-2 text-xs font-mono rounded-xl bg-black/35 border border-white/10 text-slate-300 focus:outline-none focus:border-sky-500 transition-all resize-none"
+              />
               <button
                 onClick={handleImportSave}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl text-white transition-all cursor-pointer ${
+                className={`w-full py-2 text-xs font-bold rounded-xl text-white transition-all cursor-pointer ${
                   pastedStatus === 'success'
                     ? 'bg-emerald-500'
                     : pastedStatus === 'error'
                     ? 'bg-rose-500'
-                    : 'bg-sky-500 hover:bg-sky-600'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
                 }`}
               >
-                {pastedStatus === 'success' ? 'Успешно!' : pastedStatus === 'error' ? 'Ошибка!' : 'Импорт'}
+                {pastedStatus === 'success' ? 'Прогресс успешно импортирован! Перезагрузка...' : pastedStatus === 'error' ? 'Ошибка! Неверный код сохранения' : 'Импортировать и загрузить'}
               </button>
             </div>
           </div>

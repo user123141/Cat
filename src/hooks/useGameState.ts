@@ -1,9 +1,12 @@
 // src/hooks/useGameState.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Cat, PlayerProfile, DailyQuest, Skin, NotificationItem, GameAnalytics, DiaryEntry } from '../types';
-import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { FirebaseLogger } from '../utils/FirebaseLogger';
+import { GameLogger } from '../utils/GameLogger';
+import { useNotifications } from './useNotifications';
+import { useSync } from './useSync';
+import { checkAchievements } from '../game/achievements';
+import { calculateDecay, calculateOfflineDecay } from '../game/decay';
+import { smartMergeProfiles } from '../game/merge';
 
 // ==================== КОНСТАНТЫ ====================
 
@@ -18,17 +21,17 @@ export const INITIAL_SKINS: Skin[] = [
   { id: 'sakura_dream', name: 'Лепесток Сакуры', description: 'Волшебная бело-розовая шубка с узором цветущей вишни.', cost: 1800, breed: 'Sakura Neko', color: '#fff1f2', patternColor: '#fda4af', eyeColor: '#ec4899', rarity: 'legendary' },
   { id: 'galaxy_cat', name: 'Космическая Небула', description: 'Звездный космический мех, сияющий всеми цветами галактики.', cost: 2900, breed: 'Galaxy Cat', color: '#312e81', patternColor: '#6366f1', eyeColor: '#a855f7', rarity: 'legendary' },
   
-  { id: 'collar_bell', name: 'Ошейник с Бубенчиком', description: 'Традиционный красный ремешок с сияющим золотым колокольчиком.', cost: 120, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'collar_bell', rarity: 'common' },
-  { id: 'cool_glasses', name: 'Кибер Очки', description: 'Стильные темные очки для самых уверенных в себе котиков.', cost: 320, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'cool_glasses', rarity: 'rare' },
-  { id: 'bow_tie', name: 'Джентльменская Бабочка', description: 'Красная шелковая бабочка для праздничных и элегантных моментов.', cost: 280, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'bow_tie', rarity: 'rare' },
-  { id: 'gold_crown', name: 'Императорская Корона', description: 'Корона из чистейшего золота для истинного правителя вашей комнаты.', cost: 1400, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'gold_crown', rarity: 'legendary' },
-  { id: 'wizard_hat', name: 'Колпак Волшебника', description: 'Синяя шляпа со звездами, наделяющая кота магией мурчания.', cost: 1800, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'wizard_hat', rarity: 'legendary' },
-  { id: 'santa_hat', name: 'Новогодний Колпак', description: 'Уютная зимняя шапочка с пушистым белым помпоном.', cost: 240, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'santa_hat', rarity: 'common' },
-  { id: 'detective_hat', name: 'Шерлок Кот', description: 'Клетчатая шляпа для любителей раскрывать тайны пропавших вкусняшек.', cost: 450, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'detective_hat', rarity: 'epic' },
-  { id: 'party_hat', name: 'Праздничный Колпак', description: 'Смешной яркий колпачок для весёлых дней рождений.', cost: 110, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'party_hat', rarity: 'common' },
-  { id: 'scarf_red', name: 'Теплый Шарф', description: 'Уютный вязаный шарфик ручной работы.', cost: 200, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'scarf_red', rarity: 'common' },
-  { id: 'boots_black', name: 'Милые Тапочки', description: 'Мягкие теплые сапожки на лапки.', cost: 250, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'boots_black', rarity: 'common' },
-  { id: 'wings_fairy', name: 'Крылья Бабочки', description: 'Миниатюрные крылышки для легкой левитации.', cost: 300, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'wings_fairy', rarity: 'common' },
+  { id: 'collar_bell', name: 'Ошейник с Бубенчиком', description: 'Традиционный красный ремешок с сияющим золотым колокольчиком.', cost: 120, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'collar_bell', slot: 'collar', rarity: 'common' },
+  { id: 'cool_glasses', name: 'Кибер Очки', description: 'Стильные темные очки для самых уверенных в себе котиков.', cost: 320, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'cool_glasses', slot: 'glasses', rarity: 'rare' },
+  { id: 'bow_tie', name: 'Джентльменская Бабочка', description: 'Красная шелковая бабочка для праздничных и элегантных моментов.', cost: 280, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'bow_tie', slot: 'collar', rarity: 'rare' },
+  { id: 'gold_crown', name: 'Императорская Корона', description: 'Корона из чистейшего золота для истинного правителя вашей комнаты.', cost: 1400, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'gold_crown', slot: 'hat', rarity: 'legendary' },
+  { id: 'wizard_hat', name: 'Колпак Волшебника', description: 'Синяя шляпа со звездами, наделяющая кота магией мурчания.', cost: 1800, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'wizard_hat', slot: 'hat', rarity: 'legendary' },
+  { id: 'santa_hat', name: 'Новогодний Колпак', description: 'Уютная зимняя шапочка с пушистым белым помпоном.', cost: 240, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'santa_hat', slot: 'hat', rarity: 'common' },
+  { id: 'detective_hat', name: 'Шерлок Кот', description: 'Клетчатая шляпа для любителей раскрывать тайны пропавших вкусняшек.', cost: 450, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'detective_hat', slot: 'hat', rarity: 'epic' },
+  { id: 'party_hat', name: 'Праздничный Колпак', description: 'Смешной яркий колпачок для весёлых дней рождений.', cost: 110, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'party_hat', slot: 'hat', rarity: 'common' },
+  { id: 'scarf_red', name: 'Теплый Шарф', description: 'Уютный вязаный шарфик ручной работы.', cost: 200, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'scarf_red', slot: 'scarf', rarity: 'common' },
+  { id: 'boots_black', name: 'Милые Тапочки', description: 'Мягкие теплые сапожки на лапки.', cost: 250, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'boots_black', slot: 'boots', rarity: 'common' },
+  { id: 'wings_fairy', name: 'Крылья Бабочки', description: 'Миниатюрные крылышки для легкой левитации.', cost: 300, breed: 'All', color: '', patternColor: '', eyeColor: '', accessory: 'wings_fairy', slot: 'wings', rarity: 'common' },
 ];
 
 const generateExtraSkins = (): Skin[] => {
@@ -37,16 +40,16 @@ const generateExtraSkins = (): Skin[] => {
   const colors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6', '#f97316', '#a855f7'];
   const colorsRu = ['Розовый', 'Синий', 'Зеленый', 'Янтарный', 'Аметистовый', 'Малиновый', 'Бирюзовый', 'Изумрудный', 'Оранжевый', 'Фиолетовый'];
   const accessories = [
-    { key: 'glasses', name: 'Очки "Стиляга"', desc: 'Премиальные темные очки для защиты глаз от солнца.', icon: '🕶️' },
-    { key: 'scarf', name: 'Теплый Шарф', desc: 'Уютный вязаный шарфик ручной работы.', icon: '🧣' },
-    { key: 'ribbon', name: 'Шелковый Бантик', desc: 'Крутой праздничный бантик на шею питомца.', icon: '🎀' },
-    { key: 'headphones', name: 'Геймерские Наушники', desc: 'Наушники со светящимися кошачьи ушками.', icon: '🎧' },
-    { key: 'boots', name: 'Милые Тапочки', desc: 'Мягкие теплые сапожки на лапки.', icon: '🥾' },
-    { key: 'halo', name: 'Нимб Ангелочка', desc: 'Светящийся парящий нимб для самых послушных.', icon: '😇' },
-    { key: 'wings', name: 'Крылья Бабочки', desc: 'Миниатюрные крылышки для легкой левитации.', icon: '🦋' },
-    { key: 'hat', name: 'Цилиндр Фокусника', desc: 'Шикарная высокая шляпа истинного джентльмена.', icon: '🎩' },
-    { key: 'bell', name: 'Колокольчик', desc: 'Милый золотой звоночек, чтобы кот не потерялся.', icon: '🔔' },
-    { key: 'star', name: 'Звездная Заколка', desc: 'Сверкающая заколка для ушка.', icon: '⭐' },
+    { key: 'glasses', name: 'Очки "Стиляга"', desc: 'Премиальные темные очки для защиты глаз от солнца.', icon: '🕶️', slot: 'glasses' as const },
+    { key: 'scarf', name: 'Теплый Шарф', desc: 'Уютный вязаный шарфик ручной работы.', icon: '🧣', slot: 'scarf' as const },
+    { key: 'ribbon', name: 'Шелковый Бантик', desc: 'Крутой праздничный бантик на шею питомца.', icon: '🎀', slot: 'collar' as const },
+    { key: 'headphones', name: 'Геймерские Наушники', desc: 'Наушники со светящимися кошачьи ушками.', icon: '🎧', slot: 'glasses' as const },
+    { key: 'boots', name: 'Милые Тапочки', desc: 'Мягкие теплые сапожки на лапки.', icon: '🥾', slot: 'boots' as const },
+    { key: 'halo', name: 'Нимб Ангелочка', desc: 'Светящийся парящий нимб для самых послушных.', icon: '😇', slot: 'hat' as const },
+    { key: 'wings', name: 'Крылья Бабочки', desc: 'Миниатюрные крылышки для легкой левитации.', icon: '🦋', slot: 'wings' as const },
+    { key: 'hat', name: 'Цилиндр Фокусника', desc: 'Шикарная высокая шляпа истинного джентльмена.', icon: '🎩', slot: 'hat' as const },
+    { key: 'bell', name: 'Колокольчик', desc: 'Милый золотой звоночек, чтобы кот не потерялся.', icon: '🔔', slot: 'collar' as const },
+    { key: 'star', name: 'Звездная Заколка', desc: 'Сверкающая заколка для ушка.', icon: '⭐', slot: 'hat' as const },
   ];
 
   for (let i = 0; i < 50; i++) {
@@ -66,6 +69,7 @@ const generateExtraSkins = (): Skin[] => {
       patternColor: '',
       eyeColor: '',
       accessory: `${accType.key}_${colorName.toLowerCase()}`,
+      slot: accType.slot,
       rarity,
     });
   }
@@ -241,49 +245,7 @@ export const useGameState = () => {
         const elapsedSeconds = Math.max(0, (now - parsed.lastSavedTime) / 1000);
         
         if (elapsedSeconds > 45) {
-          const hours = elapsedSeconds / 3600;
-          parsed.cats = parsed.cats.map(cat => {
-            let { hunger, cleanliness, happiness, energy, status } = cat;
-            
-            if (status === 'sleeping') {
-              const sleepHoursToFull = Math.max(0, (100 - energy) / 25);
-              if (hours >= sleepHoursToFull) {
-                energy = 100;
-                status = 'idle';
-                const idleHours = hours - sleepHoursToFull;
-                
-                hunger = Math.max(0, hunger - (1.5 * sleepHoursToFull) - (8 * idleHours));
-                cleanliness = Math.max(0, cleanliness - (1.0 * sleepHoursToFull) - (5 * idleHours));
-                energy = Math.max(0, energy - (6 * idleHours));
-                
-                const hungerPenalty = hunger < 30 ? 4 : 0;
-                const cleanPenalty = cleanliness < 30 ? 4 : 0;
-                happiness = Math.max(0, happiness - (0.5 * sleepHoursToFull) - (6 * idleHours) - ((hungerPenalty + cleanPenalty) * idleHours));
-              } else {
-                energy = Math.min(100, energy + (25 * hours));
-                hunger = Math.max(0, hunger - (1.5 * hours));
-                cleanliness = Math.max(0, cleanliness - (1.0 * hours));
-                happiness = Math.max(0, happiness - (0.5 * hours));
-              }
-            } else {
-              hunger = Math.max(0, hunger - (8 * hours));
-              cleanliness = Math.max(0, cleanliness - (5 * hours));
-              energy = Math.max(0, energy - (6 * hours));
-              
-              const hungerPenalty = hunger < 30 ? 4 : 0;
-              const cleanPenalty = cleanliness < 30 ? 4 : 0;
-              happiness = Math.max(0, happiness - ((6 + hungerPenalty + cleanPenalty) * hours));
-            }
-            
-            return {
-              ...cat,
-              hunger: Math.round(hunger * 10) / 10,
-              cleanliness: Math.round(cleanliness * 10) / 10,
-              happiness: Math.round(happiness * 10) / 10,
-              energy: Math.round(energy * 10) / 10,
-              status
-            };
-          });
+          parsed.cats = calculateOfflineDecay(parsed.cats, elapsedSeconds);
         }
       }
 
@@ -294,16 +256,15 @@ export const useGameState = () => {
     }
   });
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const [syncing, setSyncing] = useState<boolean>(false);
-  
   const [isOfflineMode, setIsOfflineMode] = useState<boolean>(false);
-  const [syncLog, setSyncLog] = useState<string[]>(['[Система] Лог синхронизации активирован. Ожидание сеанса.']);
-  const [lastSyncedTime, setLastSyncedTime] = useState<string>('Не синхронизировано');
-  const [showConflictModal, setShowConflictModal] = useState<boolean>(false);
-  const [conflictCloudData, setConflictCloudData] = useState<PlayerProfile | null>(null);
-  const [conflictLocalData, setConflictLocalData] = useState<PlayerProfile | null>(null);
+
+  const {
+    notifications,
+    addNotification,
+    removeNotification,
+    sendNativeNotification,
+  } = useNotifications();
 
   const [analytics, setAnalytics] = useState<GameAnalytics>({
     pawsSpent: 0,
@@ -351,20 +312,18 @@ export const useGameState = () => {
     });
   }, []);
 
-  const addNotification = useCallback((title: string, message: string, type: 'info' | 'success' | 'warning' | 'paw') => {
-    const newNotif: NotificationItem = {
-      id: Math.random().toString(),
-      title,
-      message,
-      type,
-      timestamp: Date.now(),
-    };
-    setNotifications((prev) => [newNotif, ...prev.slice(0, 9)]);
-  }, []);
-
-  const removeNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+  const {
+    syncing,
+    syncLog,
+    lastSyncedTime,
+    showConflictModal,
+    setShowConflictModal,
+    conflictCloudData,
+    conflictLocalData,
+    triggerCloudSync,
+    resolveConflict,
+    simulateConflictDeviceSwitch,
+  } = useSync(profile, setProfile, addNotification, isOnline, isOfflineMode);
 
   const checkForNewAchievements = useCallback((prev: PlayerProfile): PlayerProfile => {
     if (!prev.unlockedAchievements) prev.unlockedAchievements = [];
@@ -541,9 +500,10 @@ export const useGameState = () => {
     };
 
     const checkedProfile = checkForNewAchievements(newProfile);
-    updateProfile(() => checkedProfile);
+    setProfile(checkedProfile);
+    localStorage.setItem('maccat_profile', JSON.stringify(checkedProfile));
     addNotification('Котенок приютен! 🍼', `${initialCatName} присоединился к вашему рабочему столу!`, 'success');
-  }, [addNotification, checkForNewAchievements, updateProfile]);
+  }, [addNotification, checkForNewAchievements]);
 
   // ================== ОПТИМИЗИРОВАННЫЙ УПАДОК С УВЕДОМЛЕНИЯМИ ==================
   useEffect(() => {
@@ -556,39 +516,7 @@ export const useGameState = () => {
       setProfile((prev) => {
         if (!prev) return null;
 
-        let totalPawsDiff = 0;
-        const updatedCats = prev.cats.map((cat) => {
-          let { hunger, happiness, cleanliness, energy, status } = cat;
-
-          const decayMultiplier = 0.5;
-
-          if (status === 'sleeping') {
-            energy = Math.min(100, energy + 7 * decayMultiplier * 2);
-            hunger = Math.max(0, hunger - 0.7 * decayMultiplier);
-            if (energy < 100 && Math.random() < 0.3 * decayMultiplier) {
-              totalPawsDiff += 1;
-            }
-            if (energy >= 100) {
-              status = 'idle';
-            }
-          } else {
-            hunger = Math.max(0, hunger - 1.2 * decayMultiplier);
-            cleanliness = Math.max(0, cleanliness - 0.8 * decayMultiplier);
-            energy = Math.max(0, energy - 1.0 * decayMultiplier);
-
-            const penalty = (hunger < 30 ? 1 : 0) + (cleanliness < 30 ? 1 : 0) + (energy < 20 ? 1 : 0);
-            happiness = Math.max(0, happiness - (0.6 + penalty) * decayMultiplier);
-          }
-
-          return {
-            ...cat,
-            hunger: Math.round(hunger * 10) / 10,
-            happiness: Math.round(happiness * 10) / 10,
-            cleanliness: Math.round(cleanliness * 10) / 10,
-            energy: Math.round(energy * 10) / 10,
-            status,
-          };
-        });
+        const { updatedCats, totalPawsDiff } = calculateDecay(prev.cats, 0.5);
 
         const now = Date.now();
         const oneHour = 60 * 60 * 1000;
@@ -1137,20 +1065,24 @@ export const useGameState = () => {
         if (cat.id !== catId) return cat;
 
         if (isAccessory) {
-          const accLower = selectedSkin.accessory!.toLowerCase();
-          let slot: keyof Pick<Cat, 'hat' | 'glasses' | 'collar' | 'scarf' | 'boots' | 'wings'> | null = null;
-          if (accLower.includes('hat') || accLower.includes('halo') || accLower.includes('crown') || accLower.includes('cap') || accLower.includes('shlyapa') || accLower.includes('kolpak')) {
-            slot = 'hat';
-          } else if (accLower.includes('glasses') || accLower.includes('eyewear') || accLower.includes('headphones') || accLower.includes('ochki') || accLower.includes('naushniki')) {
-            slot = 'glasses';
-          } else if (accLower.includes('collar') || accLower.includes('bell') || accLower.includes('ribbon') || accLower.includes('bow') || accLower.includes('osheynik') || accLower.includes('bantik')) {
-            slot = 'collar';
-          } else if (accLower.includes('scarf') || accLower.includes('sharf')) {
-            slot = 'scarf';
-          } else if (accLower.includes('boots') || accLower.includes('footwear') || accLower.includes('shoes') || accLower.includes('tapochki') || accLower.includes('sapozhki')) {
-            slot = 'boots';
-          } else if (accLower.includes('wings') || accLower.includes('krylya')) {
-            slot = 'wings';
+          let slot: keyof Pick<Cat, 'hat' | 'glasses' | 'collar' | 'scarf' | 'boots' | 'wings'> | null = 
+            selectedSkin.slot || null;
+
+          if (!slot) {
+            const accLower = selectedSkin.accessory!.toLowerCase();
+            if (accLower.includes('hat') || accLower.includes('halo') || accLower.includes('crown') || accLower.includes('cap') || accLower.includes('shlyapa') || accLower.includes('kolpak')) {
+              slot = 'hat';
+            } else if (accLower.includes('glasses') || accLower.includes('eyewear') || accLower.includes('headphones') || accLower.includes('ochki') || accLower.includes('naushniki')) {
+              slot = 'glasses';
+            } else if (accLower.includes('collar') || accLower.includes('bell') || accLower.includes('ribbon') || accLower.includes('bow') || accLower.includes('osheynik') || accLower.includes('bantik')) {
+              slot = 'collar';
+            } else if (accLower.includes('scarf') || accLower.includes('sharf')) {
+              slot = 'scarf';
+            } else if (accLower.includes('boots') || accLower.includes('footwear') || accLower.includes('shoes') || accLower.includes('tapochki') || accLower.includes('sapozhki')) {
+              slot = 'boots';
+            } else if (accLower.includes('wings') || accLower.includes('krylya')) {
+              slot = 'wings';
+            }
           }
 
           if (!slot) {
@@ -1317,77 +1249,6 @@ export const useGameState = () => {
     });
   }, [profile, addNotification, updateProfile]);
 
-  const smartMergeProfiles = useCallback((local: PlayerProfile, cloud: PlayerProfile): PlayerProfile => {
-    const unlockedSkins = Array.from(new Set([...(local.unlockedSkins || []), ...(cloud.unlockedSkins || [])]));
-    const unlockedBreeds = Array.from(new Set([...(local.unlockedBreeds || []), ...(cloud.unlockedBreeds || [])]));
-    const unlockedAchievements = Array.from(new Set([...(local.unlockedAchievements || []), ...(cloud.unlockedAchievements || [])]));
-    const redeemedPromos = Array.from(new Set([...(local.redeemedPromos || []), ...(cloud.redeemedPromos || [])]));
-
-    const paws = Math.max(local.paws, cloud.paws);
-
-    const mergedCatsMap = new Map<string, Cat>();
-    (cloud.cats || []).forEach(cat => mergedCatsMap.set(cat.id, { ...cat }));
-    (local.cats || []).forEach(localCat => {
-      const cloudCat = mergedCatsMap.get(localCat.id);
-      if (cloudCat) {
-        mergedCatsMap.set(localCat.id, {
-          ...cloudCat,
-          name: localCat.name || cloudCat.name,
-          level: Math.max(localCat.level, cloudCat.level),
-          xp: Math.max(localCat.xp, cloudCat.xp),
-          hunger: Math.max(localCat.hunger, cloudCat.hunger),
-          happiness: Math.max(localCat.happiness, cloudCat.happiness),
-          cleanliness: Math.max(localCat.cleanliness, cloudCat.cleanliness),
-          energy: Math.max(localCat.energy, cloudCat.energy),
-          status: localCat.status !== 'idle' ? localCat.status : cloudCat.status,
-          hat: localCat.hat || cloudCat.hat,
-          glasses: localCat.glasses || cloudCat.glasses,
-          collar: localCat.collar || cloudCat.collar,
-          scarf: localCat.scarf || cloudCat.scarf,
-          boots: localCat.boots || cloudCat.boots,
-          wings: localCat.wings || cloudCat.wings,
-          accessory: localCat.accessory || cloudCat.accessory,
-        });
-      } else {
-        mergedCatsMap.set(localCat.id, { ...localCat });
-      }
-    });
-
-    const mergedCats = Array.from(mergedCatsMap.values());
-
-    const mergedQuests = (local.quests || []).map(lq => {
-      const cq = (cloud.quests || []).find(q => q.id === lq.id);
-      if (!cq) return lq;
-      const completed = lq.completed || cq.completed;
-      const claimed = lq.claimed || cq.claimed;
-      const progress = Math.max(lq.progress, cq.progress);
-      return {
-        ...lq,
-        progress: completed ? lq.target : progress,
-        completed,
-        claimed,
-      };
-    });
-
-    return {
-      ...local,
-      paws,
-      unlockedSkins,
-      unlockedBreeds,
-      unlockedAchievements,
-      redeemedPromos,
-      cats: mergedCats,
-      quests: mergedQuests,
-      totalPlayTime: Math.max(local.totalPlayTime || 0, cloud.totalPlayTime || 0),
-      totalInteractions: Math.max(local.totalInteractions || 0, cloud.totalInteractions || 0),
-      clicksCount: Math.max(local.clicksCount || 0, cloud.clicksCount || 0),
-      popItBurstedCount: Math.max(local.popItBurstedCount || 0, cloud.popItBurstedCount || 0),
-      keyboardClicksCount: Math.max(local.keyboardClicksCount || 0, cloud.keyboardClicksCount || 0),
-      claimedReviewReward: local.claimedReviewReward || cloud.claimedReviewReward,
-      lastPromoRedeemedTime: Math.max(local.lastPromoRedeemedTime || 0, cloud.lastPromoRedeemedTime || 0),
-    };
-  }, []);
-
   const redeemPromoCode = useCallback((code: string): { success: boolean; message: string } => {
     if (!profile) return { success: false, message: 'Профиль еще не загружен.' };
 
@@ -1443,144 +1304,14 @@ export const useGameState = () => {
     return { success: true, message: `Успешно начислено +${awardPaws} лапок!` };
   }, [profile, addNotification, checkForNewAchievements, updateProfile]);
 
-  const triggerCloudSync = useCallback(async () => {
-    const currentProfile = profileRef.current;
-    if (!currentProfile) return;
-    
-    const online = isOnline && navigator.onLine;
-    if (!online || isOfflineMode) {
-      FirebaseLogger.log('warn', `Синхронизация отклонена: оффлайн-режим (isOfflineMode=${isOfflineMode}, isOnline=${isOnline}, navigator.onLine=${navigator.onLine})`);
-      addNotification('Сбой сети 🌐', 'В данный момент вы оффлайн. Прогресс сохранен в локальный кэш.', 'warning');
-      const timeStr = new Date().toLocaleTimeString();
-      setSyncLog(prev => [`[${timeStr}] ⚠️ Оффлайн – синхронизация отложена.`, ...prev]);
-      return;
-    }
-
-    setSyncing(true);
-    FirebaseLogger.log('info', `Начало синхронизации профиля ${currentProfile.nickname} с Firestore...`);
-    addNotification('Сохранение...', 'Подключение к Firebase Firestore...', 'info');
-    const timeStr = new Date().toLocaleTimeString();
-    setSyncLog(prev => [`[${timeStr}] 📡 Попытка подключения к Firestore...`, ...prev]);
-
-    try {
-      const uid = localStorage.getItem('maccat_local_uid') || currentProfile.nickname;
-      const userRef = doc(db, 'users', uid);
-      const docSnap = await getDoc(userRef);
-
-      if (docSnap.exists()) {
-        const cloudProfile = docSnap.data() as PlayerProfile;
-        FirebaseLogger.log('info', `Профиль обнаружен на сервере Firestore. Сравнение параметров...`);
-        
-        const isConflict = 
-          (cloudProfile.paws > currentProfile.paws) || 
-          (cloudProfile.cats.length > currentProfile.cats.length) ||
-          cloudProfile.cats.some(cc => {
-            const lc = currentProfile.cats.find(cat => cat.id === cc.id);
-            if (!lc) return true;
-            if (cc.level > lc.level) return true;
-            if (cc.level === lc.level && cc.xp > lc.xp) return true;
-            return false;
-          }) ||
-          (cloudProfile.unlockedSkins && cloudProfile.unlockedSkins.some(s => !currentProfile.unlockedSkins.includes(s)));
-
-        if (isConflict) {
-          FirebaseLogger.log('warn', `Обнаружен конфликт версий! Облачные paws=${cloudProfile.paws}, локальные paws=${currentProfile.paws}.`);
-          setSyncing(false);
-          const timeConflict = new Date().toLocaleTimeString();
-          setSyncLog(prev => [`[${timeConflict}] ⚠️ Обнаружена рассинхронизация с сервером Firebase (другое устройство)!`, ...prev]);
-          
-          setConflictCloudData(cloudProfile);
-          setConflictLocalData(currentProfile);
-          setShowConflictModal(true);
-          addNotification('Конфликт данных! ⚠️', 'Обнаружены разные сейвы в Firebase и на этом телефоне. Выберите действие.', 'warning');
-          return;
-        }
-      }
-
-      FirebaseLogger.log('info', `Конфликтов не обнаружено. Запись данных в Firestore...`);
-      const now = Date.now();
-      const updatedProfile = { 
-        ...currentProfile, 
-        lastSavedTime: now 
-      };
-
-      const cleanedProfile = { ...updatedProfile };
-      Object.keys(cleanedProfile).forEach(key => {
-        if ((cleanedProfile as any)[key] === undefined) {
-          delete (cleanedProfile as any)[key];
-        }
-      });
-
-      await setDoc(userRef, cleanedProfile, { merge: true });
-      FirebaseLogger.log('success', `Данные успешно записаны в Firestore для ${currentProfile.nickname}!`);
-      
-      updateProfile(() => updatedProfile);
-      
-      setSyncing(false);
-      const timeOk = new Date().toLocaleTimeString();
-      setLastSyncedTime(timeOk);
-      setSyncLog(prev => [`[${timeOk}] ✅ Данные успешно записаны в облако Firestore. Базы идентичны.`, ...prev]);
-      addNotification('Сохранено в iCloud! ☁️', 'Ваш прогресс в облаке успешно обновлен.', 'success');
-    } catch (err: any) {
-      if (err.message?.includes('offline') || err.code === 'unavailable' || err.code === 'network-request-failed' || err.code === 'unauthenticated') {
-        FirebaseLogger.log('warn', `Синхронизация не удалась из-за проблем с сетью: ${err.message}`);
-        addNotification('Нет соединения 🌐', 'Попробуйте позже, когда появится интернет.', 'warning');
-        setSyncing(false);
-        return;
-      }
-      FirebaseLogger.log('error', `Ошибка при синхронизации с Firestore: ${err?.message || err}`);
-      console.error('Ошибка при синхронизации с Firestore:', err);
-      setSyncing(false);
-      const timeErr = new Date().toLocaleTimeString();
-      setSyncLog(prev => [`[${timeErr}] ❌ Ошибка соединения: ${err?.message || err}`, ...prev]);
-      addNotification('Ошибка синхронизации ⚠️', 'Не удалось связаться с облаком Firebase.', 'error');
-    }
-  }, [isOnline, isOfflineMode, addNotification, updateProfile]);
-
-  const simulateConflictDeviceSwitch = useCallback(() => {
-    if (!profile) return;
-    
-    const dummyCloud: PlayerProfile = {
-      ...profile,
-      paws: profile.paws + 850,
-      unlockedSkins: Array.from(new Set([...profile.unlockedSkins, 'galaxy_cat', 'bengal_leopard'])),
-      cats: profile.cats.map((c, i) => i === 0 ? { ...c, level: c.level + 2, xp: 50 } : c),
+  const handleResolveConflict = useCallback((resolution: 'merge' | 'keep_local' | 'keep_cloud') => {
+    const choiceMap: Record<string, 'local' | 'cloud' | 'merge'> = {
+      keep_local: 'local',
+      keep_cloud: 'cloud',
+      merge: 'merge',
     };
-
-    localStorage.setItem('maccat_cloud_db', JSON.stringify(dummyCloud));
-    addNotification('Конфликт создан! ⚡', 'В облако Firebase записаны другие данные (типа с iPad). Теперь нажмите "Выгрузить в iCloud".', 'info');
-    const timeStr = new Date().toLocaleTimeString();
-    setSyncLog(prev => [`[${timeStr}] 📲 Симуляция: другое устройство записало в Firebase прогресс (+850 🐾, +2 уровня кота, Galaxy скины).`, ...prev]);
-  }, [profile, addNotification]);
-
-  const resolveConflict = useCallback((resolution: 'merge' | 'keep_local' | 'keep_cloud') => {
-    if (!conflictLocalData || !conflictCloudData) return;
-
-    let finalProfile: PlayerProfile;
-
-    if (resolution === 'merge') {
-      finalProfile = smartMergeProfiles(conflictLocalData, conflictCloudData);
-      addNotification('Прогресс объединен! 🐾', 'Данные устройств бережно слиты в один файл. Никакой прогресс не утерян!', 'success');
-    } else if (resolution === 'keep_cloud') {
-      finalProfile = conflictCloudData;
-      addNotification('Прогресс загружен! ☁️', 'Локальные данные заменены более старыми или альтернативными из облака.', 'info');
-    } else {
-      finalProfile = conflictLocalData;
-      addNotification('Облако перезаписано! 💾', 'Локальный прогресс объявлен главным и выгружен в облако.', 'info');
-    }
-
-    updateProfile(() => finalProfile);
-    localStorage.setItem('maccat_profile', JSON.stringify(finalProfile));
-    localStorage.setItem('maccat_cloud_db', JSON.stringify(finalProfile));
-
-    setShowConflictModal(false);
-    setConflictCloudData(null);
-    setConflictLocalData(null);
-
-    const timeStr = new Date().toLocaleTimeString();
-    setLastSyncedTime(timeStr);
-    setSyncLog(prev => [`[${timeStr}] ✅ Конфликт успешно разрешен методом: [${resolution === 'merge' ? 'Умное Слияние' : resolution === 'keep_cloud' ? 'Приоритет Облака' : 'Приоритет Устройства'}].`, ...prev]);
-  }, [conflictLocalData, conflictCloudData, smartMergeProfiles, addNotification, updateProfile]);
+    resolveConflict(choiceMap[resolution] || 'merge');
+  }, [resolveConflict]);
 
   const claimStreakMilestone = useCallback((milestoneId: string) => {
     if (!profile) return;
@@ -1695,7 +1426,7 @@ export const useGameState = () => {
     setShowConflictModal,
     conflictCloudData,
     conflictLocalData,
-    resolveConflict,
+    resolveConflict: handleResolveConflict,
     simulateConflictDeviceSwitch,
     redeemPromoCode,
     createProfile,

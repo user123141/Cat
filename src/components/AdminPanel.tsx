@@ -7,7 +7,7 @@ interface AdminPanelProps {
   onClose: () => void;
   onUpdateUsers: () => void;
   currentUser: any;
-  onBlockUser: (userId: string) => Promise<void>;
+  onBlockUser: (userId: string, reason: string, durationMinutes: number) => Promise<void>;
   onUnblockUser: (userId: string) => Promise<void>;
   onDeleteUser: (userId: string) => Promise<void>;
   onMakeAdmin: (userId: string) => Promise<void>;
@@ -29,6 +29,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'success' | 'error' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [banReason, setBanReason] = useState('Нарушение правил игры');
+  const [banDuration, setBanDuration] = useState<number>(-1); // -1 is permanent
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setCopiedKeyId(null);
+  }, [selectedUser]);
+
+  const handleExportUserKey = (user: any) => {
+    try {
+      // Create a clean replica without supabase-added local helper fields if any
+      const userCopy = { ...user };
+      const dataStr = JSON.stringify(userCopy);
+      const b64 = btoa(unescape(encodeURIComponent(dataStr)));
+      navigator.clipboard.writeText(b64);
+      setCopiedKeyId(user.id);
+      setTimeout(() => setCopiedKeyId(null), 3000);
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка при экспорте ключа прогресса');
+    }
+  };
 
   const sortedUsers = [...usersList].sort((a, b) => (b.paws || 0) - (a.paws || 0));
 
@@ -37,7 +59,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       switch (action) {
         case 'block':
-          await onBlockUser(userId);
+          await onBlockUser(userId, banReason, banDuration);
           setActionMessage(`Пользователь заблокирован`);
           break;
         case 'unblock':
@@ -204,7 +226,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="bg-white/5 rounded-xl p-3">
                     <span className="text-slate-400 text-[10px] uppercase tracking-wider">Уровень</span>
                     <p className="text-white font-bold text-lg">
-                      {selectedUser.cats?.reduce((max: number, cat: any) => Math.max(max, cat.level || 1), 1)}
+                      {selectedUser.cats?.reduce((max: number, cat: any) => Math.max(max, cat.level || 1), 1) || 1}
                     </p>
                   </div>
                   <div className="bg-white/5 rounded-xl p-3">
@@ -213,38 +235,78 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
                 </div>
 
-                <div className="border-t border-white/5 pt-3">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Действия</h4>
+                <div className="border-t border-white/5 pt-3 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Параметры бана</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1 font-medium">Причина:</label>
+                      <input
+                        type="text"
+                        value={banReason}
+                        onChange={(e) => setBanReason(e.target.value)}
+                        placeholder="Причина блокировки"
+                        className="w-full px-3 py-1.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1 font-medium">Срок:</label>
+                      <select
+                        value={banDuration}
+                        onChange={(e) => setBanDuration(Number(e.target.value))}
+                        className="w-full px-3 py-1.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-sky-500"
+                      >
+                        <option value={-1}>Перманентно ♾️</option>
+                        <option value={1}>1 минута ⏱️</option>
+                        <option value={5}>5 минут ⏱️</option>
+                        <option value={10}>10 минут ⏱️</option>
+                        <option value={60}>1 час ⏳</option>
+                        <option value={1440}>1 день 📅</option>
+                        <option value={10080}>1 неделя 📅</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-1 mb-2">Действия с аккаунтом</h4>
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => handleAction('block', selectedUser.id)}
                       disabled={isLoading}
-                      className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 text-xs font-bold flex items-center gap-1 transition disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 text-xs font-bold flex items-center gap-1 transition disabled:opacity-50 cursor-pointer"
                     >
                       <Ban size={14} /> Заблокировать
                     </button>
                     <button
                       onClick={() => handleAction('unblock', selectedUser.id)}
                       disabled={isLoading}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1 transition disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1 transition disabled:opacity-50 cursor-pointer"
                     >
                       <CheckCircle size={14} /> Разблокировать
                     </button>
                     <button
                       onClick={() => handleAction('delete', selectedUser.id)}
                       disabled={isLoading}
-                      className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold flex items-center gap-1 transition disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold flex items-center gap-1 transition disabled:opacity-50 cursor-pointer"
                     >
                       <Trash2 size={14} /> Удалить
                     </button>
                     <button
                       onClick={() => handleAction('make_admin', selectedUser.id)}
                       disabled={isLoading}
-                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1 transition disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1 transition disabled:opacity-50 cursor-pointer"
                     >
-                      <Crown size={14} /> Назначить админом
+                      <Crown size={14} /> Сделать админом
                     </button>
                   </div>
+                </div>
+
+                <div className="border-t border-white/5 pt-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Экспорт ключа прогресса</h4>
+                  <button
+                    onClick={() => handleExportUserKey(selectedUser)}
+                    className="w-full py-2 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-[0.98] cursor-pointer shadow-lg shadow-violet-600/10"
+                  >
+                    🔑 {copiedKeyId === selectedUser.id ? 'Ключ успешно скопирован! ✅' : 'Скопировать экспорт-код прогресса'}
+                  </button>
                 </div>
 
                 <div className="border-t border-white/5 pt-3">
@@ -259,7 +321,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       onClick={handleBalanceChange}
                       disabled={isLoading}
-                      className="px-4 py-1.5 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition disabled:opacity-50"
+                      className="px-4 py-1.5 rounded-xl bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition disabled:opacity-50 cursor-pointer"
                     >
                       Применить
                     </button>

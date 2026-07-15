@@ -24,6 +24,8 @@ export interface Cat {
   lastInteraction?: number;
 }
 
+export type AccessorySlot = 'hat' | 'glasses' | 'collar' | 'scarf' | 'boots' | 'wings';
+
 export interface Skin {
   id: string;
   name: string;
@@ -35,6 +37,7 @@ export interface Skin {
   cost: number;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   accessory?: string; // идентификатор аксессуара
+  slot?: AccessorySlot; // Слот для аксессуаров
 }
 
 export interface DailyQuest {
@@ -103,6 +106,8 @@ export interface PlayerProfile {
   claimedReviewReward: boolean;
   isAdmin?: boolean;
   blocked?: boolean;
+  blockedReason?: string;
+  blockedUntil?: number; // timestamp, or -1 for permanent
   claimedStreakMilestones?: string[];
   careCalendarHistory?: string[];
   lastActiveDay?: string;

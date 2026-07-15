@@ -111,7 +111,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-slate-400 flex items-center gap-1.5">
                     <RefreshCw size={11} className={`text-sky-400 ${syncing ? 'animate-spin' : ''}`} />
-                    Облачная БД
+                    Резервная база данных
                   </span>
                   <span className="font-bold text-slate-200">
                     {syncing ? 'Синхронизация...' : 'В силе (авто)'}
@@ -122,7 +122,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                 <div className="flex justify-between items-center text-[11px]">
                   <span className="text-slate-400 flex items-center gap-1.5">
                     <Database size={11} className="text-violet-400" />
-                    Сохранено в облаке
+                    Сохранено в сети
                   </span>
                   <span className="font-mono text-[10px] text-slate-300 font-bold">
                     {profile?.lastSavedTime ? new Date(profile.lastSavedTime).toLocaleTimeString() : 'Нет данных'}

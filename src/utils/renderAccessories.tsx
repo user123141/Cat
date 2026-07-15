@@ -23,12 +23,12 @@ export function getAccessoryColor(acc: string): string {
 }
 
 const ANCHORS = {
-  HEAD: { x: 0, y: -130 },
-  NECK: { x: 0, y: 20 },
+  HEAD: { x: 0, y: -58 },
+  NECK: { x: 0, y: 8 },
   BACK: { x: 0, y: 35 },
-  FEET: { x: 0, y: 145 },
+  FEET: { x: 0, y: 72 },
   EYES: { x: 0, y: -30 },
-  HAIR: { x: 44, y: -120 },
+  HAIR: { x: 40, y: -70 },
 };
 
 const HatBase: React.FC<{ color: string; children: React.ReactNode }> = ({ color, children }) => (
@@ -212,10 +212,10 @@ const BootsAccessory: React.FC<{ color: string }> = ({ color }) => (
 
 const WingsAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform={`translate(${ANCHORS.BACK.x}, ${ANCHORS.BACK.y + 5})`} opacity="0.85">
-    <path d="M-56 -30C-130 -90 -170 -20 -110 20C-80 40 -60 20 -56 10" fill={color} stroke={color} strokeWidth="3" />
-    <path d="M-56 10C-110 40 -130 70 -96 90C-70 104 -56 70 -56 50" fill={color} opacity="0.7" />
-    <path d="M56 -30C130 -90 170 -20 110 20C80 40 60 20 56 10" fill={color} stroke={color} strokeWidth="3" />
-    <path d="M56 10C110 40 130 70 96 90C70 104 56 70 56 50" fill={color} opacity="0.7" />
+    <path d="M-56 -30C-130 -90 -170 -20 -110 20C-80 40 -60 20 -56 10Z" fill={color} stroke={color} strokeWidth="3" />
+    <path d="M-56 10C-110 40 -130 70 -96 90C-70 104 -56 70 -56 50Z" fill={color} opacity="0.7" />
+    <path d="M56 -30C130 -90 170 -20 110 20C80 40 60 20 56 10Z" fill={color} stroke={color} strokeWidth="3" />
+    <path d="M56 10C110 40 130 70 96 90C70 104 56 70 56 50Z" fill={color} opacity="0.7" />
     <path d="M-70 -10C-95 -30 -120 -10 -100 5" stroke="#ffffff" strokeWidth="1.5" opacity="0.4" fill="none" />
     <path d="M70 -10C95 -30 120 -10 100 5" stroke="#ffffff" strokeWidth="1.5" opacity="0.4" fill="none" />
   </g>
@@ -230,6 +230,10 @@ const HairpinAccessory: React.FC<{ color: string }> = ({ color }) => (
 
 // ----- Главный рендерер -----
 export const RenderAccessory: React.FC<{ value: string; scale?: number }> = ({ value, scale = 1 }) => {
+  if (!value || value === 'none' || value === 'empty' || value === 'null' || value === 'undefined' || value.trim() === '') {
+    return null;
+  }
+
   const color = getAccessoryColor(value);
   const lower = value.toLowerCase();
 
@@ -267,5 +271,5 @@ export const RenderAccessory: React.FC<{ value: string; scale?: number }> = ({ v
     loggedUnknown.add(value);
     console.warn(`[RenderAccessory] Неизвестный аксессуар: "${value}"`);
   }
-  return <HairpinAccessory color={color} />;
+  return null;
 };

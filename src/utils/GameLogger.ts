@@ -1,4 +1,4 @@
-// src/utils/FirebaseLogger.ts
+// src/utils/GameLogger.ts
 
 export interface LogEntry {
   timestamp: string;
@@ -6,7 +6,7 @@ export interface LogEntry {
   message: string;
 }
 
-export class FirebaseLogger {
+export class GameLogger {
   private static logs: LogEntry[] = [];
   private static listeners: ((logs: LogEntry[]) => void)[] = [];
 
@@ -18,7 +18,7 @@ export class FirebaseLogger {
     });
     
     const emoji = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : level === 'success' ? '✅' : '📡';
-    console.log(`${emoji} [FirebaseLogger ${timestamp}] ${message}`);
+    console.log(`${emoji} [SyncLogger ${timestamp}] ${message}`);
     
     const entry: LogEntry = { timestamp, level, message };
     this.logs.unshift(entry);
@@ -31,7 +31,7 @@ export class FirebaseLogger {
       try {
         listener([...this.logs]);
       } catch (e) {
-        console.error('Error in FirebaseLogger listener:', e);
+        console.error('Error in GameLogger listener:', e);
       }
     });
   }

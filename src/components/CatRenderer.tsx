@@ -3,6 +3,43 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { RenderAccessory } from '../utils/renderAccessories';
 
+const isHat = (val: string) => {
+  const lower = val.toLowerCase();
+  return lower.includes('crown') || lower.includes('корон') ||
+         lower.includes('halo') || lower.includes('нимб') ||
+         lower.includes('santa') || lower.includes('новогод') || lower.includes('санта') ||
+         lower.includes('detective') || lower.includes('шерлок') || lower.includes('детектив') ||
+         lower.includes('party') || lower.includes('празднич') ||
+         lower.includes('wizard') || lower.includes('волшеб') ||
+         lower.includes('top hat') || lower.includes('цилиндр') ||
+         lower.includes('fedora') || lower.includes('федора') ||
+         lower.includes('beanie') || lower.includes('шапк') || lower.includes('шапочк') ||
+         lower.includes('ushanka') || lower.includes('ушанк') ||
+         lower.includes('helmet') || lower.includes('шлем') ||
+         lower.includes('pirate') || lower.includes('пират') ||
+         lower.includes('cowboy') || lower.includes('ковбой') ||
+         lower.includes('hat') || lower.includes('шляп') ||
+         lower.includes('hairpin') || lower.includes('заколк') || lower.includes('star') || lower.includes('звезд') || lower.includes('шпильк');
+};
+
+const isGlasses = (val: string) => {
+  const lower = val.toLowerCase();
+  return lower.includes('glasses') || lower.includes('ochki') || lower.includes('очк') || lower.includes('очки') ||
+         lower.includes('headphones') || lower.includes('naushniki') || lower.includes('наушник') || lower.includes('гарнитур');
+};
+
+const isNeck = (val: string) => {
+  const lower = val.toLowerCase();
+  return lower.includes('collar') || lower.includes('bell') || lower.includes('ошейник') || lower.includes('колокольч') || lower.includes('колокол') ||
+         lower.includes('bow') || lower.includes('ribbon') || lower.includes('bantik') || lower.includes('бант') || lower.includes('бабочк') || lower.includes('бантик') ||
+         lower.includes('scarf') || lower.includes('sharf') || lower.includes('шарф');
+};
+
+const isBoots = (val: string) => {
+  const lower = val.toLowerCase();
+  return lower.includes('boots') || lower.includes('slippers') || lower.includes('tapochki') || lower.includes('sapozhki') || lower.includes('тапочк') || lower.includes('сапожк') || lower.includes('туфл') || lower.includes('ботинк');
+};
+
 interface CatRendererProps {
   breed: string;
   color: string;
@@ -19,9 +56,12 @@ interface CatRendererProps {
   size?: number;
   className?: string;
   personality?: 'lazy' | 'playful' | 'hungry';
+  staticPreview?: boolean;
+  scale?: number;
+  emotion?: 'normal' | 'happy' | 'sleepy' | 'angry';
 }
 
-export const CatRenderer: React.FC<CatRendererProps> = ({
+export const CatRenderer: React.FC<CatRendererProps> = React.memo(({
   breed,
   color,
   patternColor,
@@ -37,11 +77,15 @@ export const CatRenderer: React.FC<CatRendererProps> = ({
   size = 200,
   className = '',
   personality = 'lazy',
+  staticPreview = false,
+  scale = 1,
+  emotion = 'normal',
 }) => {
   const [randomStatus, setRandomStatus] = React.useState<typeof status>(status);
   const [awakeAnim, setAwakeAnim] = React.useState<'none' | 'blinking' | 'tail_flick' | 'ear_twitch'>('none');
 
   React.useEffect(() => {
+    if (staticPreview) return;
     if (status === 'sleeping') {
       setRandomStatus('sleeping');
       setAwakeAnim('none');
@@ -60,7 +104,7 @@ export const CatRenderer: React.FC<CatRendererProps> = ({
       setRandomStatus(randomActivity);
     }, 4500);
     return () => clearInterval(interval);
-  }, [status]);
+  }, [status, staticPreview]);
 
   React.useEffect(() => {
     if (status === 'sleeping') {
@@ -138,21 +182,22 @@ export const CatRenderer: React.FC<CatRendererProps> = ({
     },
   };
 
-const renderAccessories = () => {
-  const items = [];
-  if (hat) items.push(hat);
-  if (glasses) items.push(glasses);
-  if (collar) items.push(collar);
-  if (scarf) items.push(scarf);
-  if (boots) items.push(boots);
-  if (wings) items.push(wings);
-  if (accessory && !items.includes(accessory)) items.push(accessory);
-  return items.map((item, idx) => (
-    <g key={idx} transform="translate(100, 100)">
-      <RenderAccessory value={item} scale={1} />
-    </g>
-  ));
-};
+  // Check if we have wings to draw in the background layer
+  const activeWings = React.useMemo(() => {
+    if (wings) return wings;
+    if (accessory) {
+      const lower = accessory.toLowerCase();
+      if (lower.includes('wing') || lower.includes('крыл')) {
+        return accessory;
+      }
+    }
+    return null;
+  }, [wings, accessory]);
+
+  const resolvedHat = hat || (accessory && isHat(accessory) ? accessory : undefined);
+  const resolvedGlasses = glasses || (accessory && isGlasses(accessory) ? accessory : undefined);
+  const resolvedNeck = collar || scarf || (accessory && isNeck(accessory) ? accessory : undefined);
+  const resolvedBoots = boots || (accessory && isBoots(accessory) ? accessory : undefined);
 
   return (
     <div style={{ width: size, height: size }} className={`relative flex items-center justify-center select-none ${className}`}>
@@ -199,8 +244,17 @@ const renderAccessories = () => {
         className="w-full h-full flex items-center justify-center origin-bottom"
       >
         <svg width="100%" height="100%" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Shadow */}
           <ellipse cx="100" cy="175" rx="55" ry="12" fill="rgba(0,0,0,0.06)" />
 
+          {/* 🦋 BACKGROUND LAYER ACCESSORIES (WINGS!) */}
+          {activeWings && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={activeWings} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+
+          {/* Tail */}
           <motion.path
             d="M145 140C165 140 175 110 170 90C166 75 155 75 150 85C145 95 155 125 135 145"
             stroke={color}
@@ -212,21 +266,21 @@ const renderAccessories = () => {
             transition={awakeAnim === 'tail_flick' ? { duration: 0.8, ease: 'easeInOut' } : { duration: 4, repeat: Infinity, ease: 'easeInOut' }}
           />
 
+          {/* Body */}
           {breed === 'Sphynx' ? (
             <path d="M60 160C60 120 70 100 100 100C130 100 140 120 140 160C140 175 130 180 100 180C70 180 60 175 60 160Z" fill={color} />
           ) : (
             <path d="M50 155C50 115 65 95 100 95C135 95 150 115 150 155C150 175 135 180 100 180C65 180 50 175 50 155Z" fill={color} />
           )}
 
-          {breed === 'Siamese' && (
+          {/* Paws */}
+          {breed === 'Siamese' ? (
             <>
               <path d="M90 125C95 120 105 120 110 125C108 140 92 140 90 125Z" fill={patternColor} />
               <ellipse cx="75" cy="170" rx="12" ry="8" fill={patternColor} />
               <ellipse cx="125" cy="170" rx="12" ry="8" fill={patternColor} />
             </>
-          )}
-
-          {breed !== 'Siamese' && (
+          ) : (
             <>
               <ellipse cx="75" cy="172" rx="14" ry="10" fill={color} />
               <ellipse cx="125" cy="172" rx="14" ry="10" fill={color} />
@@ -235,6 +289,19 @@ const renderAccessories = () => {
             </>
           )}
 
+          {/* 👢 BOOTS LAYER */}
+          {boots && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={boots} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+          {!boots && resolvedBoots && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={resolvedBoots} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+
+          {/* Whiskers / Details */}
           {breed === 'British Shorthair' && (
             <>
               <path d="M55 135H70" stroke={patternColor} strokeWidth="4" strokeLinecap="round" opacity="0.3" />
@@ -244,6 +311,24 @@ const renderAccessories = () => {
             </>
           )}
 
+          {/* 🧣 NECK LAYER */}
+          {collar && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={collar} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+          {scarf && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={scarf} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+          {!collar && !scarf && resolvedNeck && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={resolvedNeck} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+
+          {/* Head */}
           {breed === 'Sphynx' ? (
             <path d="M65 75C65 50 80 40 100 40C120 40 135 50 135 75C135 100 115 108 100 108C85 108 65 100 65 75Z" fill={color} />
           ) : breed === 'Persian' ? (
@@ -252,10 +337,12 @@ const renderAccessories = () => {
             <path d="M58 75C58 48 74 38 100 38C126 38 142 48 142 75C142 102 124 104 100 104C76 104 58 102 58 75Z" fill={color} />
           )}
 
+          {/* Siamese mask */}
           {breed === 'Siamese' && (
             <path d="M75 75C75 60 85 52 100 52C115 52 125 60 125 75C125 90 115 95 100 95C85 95 75 90 75 75Z" fill={patternColor} />
           )}
 
+          {/* Ears */}
           {breed === 'Sphynx' ? (
             <>
               <path d="M70 52L25 15C22 12 28 22 45 42L70 52Z" fill={color} stroke={color} strokeWidth="2" strokeLinejoin="round" />
@@ -291,10 +378,16 @@ const renderAccessories = () => {
             </>
           )}
 
-          {isSleeping || awakeAnim === 'blinking' ? (
+          {/* Eyes */}
+          {isSleeping || awakeAnim === 'blinking' || emotion === 'sleepy' ? (
             <>
               <path d="M74 72C78 75 84 75 88 72" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(0,0,0,0.65)'} strokeWidth="4.5" strokeLinecap="round" />
               <path d="M112 72C116 75 122 75 126 72" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(0,0,0,0.65)'} strokeWidth="4.5" strokeLinecap="round" />
+            </>
+          ) : emotion === 'happy' ? (
+            <>
+              <path d="M74 72C78 67 84 67 88 72" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(0,0,0,0.65)'} strokeWidth="4.5" strokeLinecap="round" />
+              <path d="M112 72C116 67 122 67 126 72" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(0,0,0,0.65)'} strokeWidth="4.5" strokeLinecap="round" />
             </>
           ) : (
             <>
@@ -317,9 +410,16 @@ const renderAccessories = () => {
               )}
               <circle cx="116" cy="67" r="2.5" fill="#ffffff" />
               <circle cx="122" cy="73" r="1" fill="#ffffff" />
+              {emotion === 'angry' && (
+                <>
+                  <path d="M70 60L92 68" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(0,0,0,0.65)'} strokeWidth="3" strokeLinecap="round" />
+                  <path d="M130 60L108 68" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(0,0,0,0.65)'} strokeWidth="3" strokeLinecap="round" />
+                </>
+              )}
             </>
           )}
 
+          {/* Blush */}
           {!isSleeping && (
             <>
               <circle cx="70" cy="79" r="6" fill="#fda4af" opacity="0.5" />
@@ -327,14 +427,17 @@ const renderAccessories = () => {
             </>
           )}
 
+          {/* Nose */}
           <path d={breed === 'Persian' ? 'M97 76L103 76L100 78Z' : 'M96 76L104 76L100 79Z'} fill="#fda4af" stroke="#f43f5e" strokeWidth="1" strokeLinecap="round" />
 
+          {/* Mouth */}
           {isEating ? (
             <ellipse cx="100" cy="86" rx="4" ry="5" fill="#f43f5e" />
           ) : (
             <path d="M93 82C95 85 99 85 100 82C101 85 105 85 107 82" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(0,0,0,0.65)'} strokeWidth="3.5" strokeLinecap="round" />
           )}
 
+          {/* Whiskers */}
           <>
             <line x1="56" y1="82" x2="32" y2="78" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(120,120,120,0.45)'} strokeWidth="2" strokeLinecap="round" />
             <line x1="54" y1="89" x2="28" y2="89" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(120,120,120,0.45)'} strokeWidth="2" strokeLinecap="round" />
@@ -342,9 +445,31 @@ const renderAccessories = () => {
             <line x1="146" y1="89" x2="172" y2="89" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(120,120,120,0.45)'} strokeWidth="2" strokeLinecap="round" />
           </>
 
-          {renderAccessories()}
+          {/* 🕶️ GLASSES / HEADPHONES LAYER */}
+          {glasses && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={glasses} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+          {!glasses && resolvedGlasses && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={resolvedGlasses} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+
+          {/* 🎩 HAT LAYER */}
+          {hat && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={hat} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
+          {!hat && resolvedHat && (
+            <g transform="translate(100, 100)">
+              <RenderAccessory value={resolvedHat} scale={scale} isSleeping={isSleeping} />
+            </g>
+          )}
         </svg>
       </motion.div>
     </div>
   );
-};
+});

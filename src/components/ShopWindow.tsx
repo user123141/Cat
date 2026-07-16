@@ -86,6 +86,47 @@ const getProductSlot = (product: ShopProduct): 'hat' | 'glasses' | 'collar' | 's
   return slot;
 };
 
+const LazyShopCatCard: React.FC<{
+  product: ShopProduct;
+  activeCat: Cat;
+  previewColors: { color: string; patternColor: string; eyeColor: string };
+  accessoryProps: any;
+}> = ({ product, activeCat, previewColors, accessoryProps }) => {
+  const [inView, setInView] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setInView(entry.isIntersecting);
+    }, { rootMargin: '100px' });
+    observer.observe(el);
+    return () => {
+      observer.unobserve(el);
+    };
+  }, []);
+
+  return (
+    <div ref={ref} className="w-16 h-16 md:w-20 md:h-20 bg-black/30 rounded-xl flex items-center justify-center overflow-hidden">
+      {inView ? (
+        <CatRenderer
+          breed={product.category === 'accessories' ? activeCat.breed : (product.originalItem as Skin).breed || activeCat.breed}
+          color={product.category === 'accessories' ? previewColors.color : (product.originalItem as Skin).color || previewColors.color}
+          patternColor={product.category === 'accessories' ? previewColors.patternColor : (product.originalItem as Skin).patternColor || previewColors.patternColor}
+          eyeColor={product.category === 'accessories' ? previewColors.eyeColor : (product.originalItem as Skin).eyeColor || previewColors.eyeColor}
+          {...accessoryProps}
+          status="idle"
+          size={60}
+          staticPreview={true}
+        />
+      ) : (
+        <div className="w-10 h-10 rounded-full bg-slate-800/40 animate-pulse" />
+      )}
+    </div>
+  );
+};
+
 export const ShopWindow: React.FC<ShopWindowProps> = ({
   profile,
   activeCat,
@@ -382,21 +423,18 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
                               {qty} шт
                             </div>
                           )}
-                          <div className="w-16 h-16 md:w-20 md:h-20 bg-black/30 rounded-xl flex items-center justify-center">
-                            {isConsumable ? (
-                              getConsumableIcon(product.id, "w-8 h-8 md:w-10 md:h-10")
-                            ) : (
-                              <CatRenderer
-                                breed={product.category === 'accessories' ? activeCat.breed : (product.originalItem as Skin).breed || activeCat.breed}
-                                color={product.category === 'accessories' ? previewColors.color : (product.originalItem as Skin).color || previewColors.color}
-                                patternColor={product.category === 'accessories' ? previewColors.patternColor : (product.originalItem as Skin).patternColor || previewColors.patternColor}
-                                eyeColor={product.category === 'accessories' ? previewColors.eyeColor : (product.originalItem as Skin).eyeColor || previewColors.eyeColor}
-                                {...accessoryProps}
-                                status="idle"
-                                size={60}
-                              />
-                            )}
-                          </div>
+                          {isConsumable ? (
+                            <div className="w-16 h-16 md:w-20 md:h-20 bg-black/30 rounded-xl flex items-center justify-center">
+                              {getConsumableIcon(product.id, "w-8 h-8 md:w-10 md:h-10")}
+                            </div>
+                          ) : (
+                            <LazyShopCatCard
+                              product={product}
+                              activeCat={activeCat || { breed: 'British Shorthair' } as Cat}
+                              previewColors={previewColors}
+                              accessoryProps={accessoryProps}
+                            />
+                          )}
                           <h4 className="text-[10px] md:text-xs font-bold text-slate-200 truncate w-full">{product.name}</h4>
                           <p className="text-[9px] text-sky-400 font-mono font-bold">
                             {isConsumable ? `${product.cost} 🐾` : owned ? 'В наличии' : `${product.cost} 🐾`}
@@ -413,7 +451,7 @@ export const ShopWindow: React.FC<ShopWindowProps> = ({
               <div className="bg-white/5 border border-white/5 rounded-2xl p-3 text-left">
                 <h3 className="text-xs font-black text-white flex items-center gap-1">
                   <Sparkles size={13} className="text-amber-400" />
-                  Магазин лапок Care OS
+                  Магазин лапок
                 </h3>
                 <p className="text-[10px] text-slate-400 leading-normal mt-0.5">
                   Получайте лапки мгновенно для быстрой прокачки и разблокировки редких аксессуаров. Фиксированный курс: <span className="font-extrabold text-sky-400">500 лапок = 199 грн</span>.

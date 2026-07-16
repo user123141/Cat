@@ -84,7 +84,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onCreateProfile }) => {
                 <div className="space-y-2">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-sky-500/10 border border-sky-400/20 rounded-full text-xs font-bold text-sky-400 uppercase tracking-wider">
                     <Sparkles size={12} className="animate-pulse" />
-                    <span>MacCat Care OS</span>
+                    <span>MacCat</span>
                   </div>
                   <h1 className="text-2xl font-black text-white tracking-tight leading-none font-display">
                     Добро пожаловать
@@ -139,7 +139,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onCreateProfile }) => {
                     Импорт прогресса
                   </h1>
                   <p className="text-xs text-slate-400 leading-relaxed px-2">
-                    Вставьте ваш скопированный 100% код сохранения/экспорта ниже, чтобы восстановить весь ваш игровой процесс Care OS.
+                    Вставьте ваш скопированный 100% код сохранения/экспорта ниже, чтобы восстановить весь ваш игровой процесс.
                   </p>
                 </div>
 

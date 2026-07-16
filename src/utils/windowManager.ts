@@ -14,6 +14,7 @@ const DESKTOP_OFFSETS: Record<string, { x: number; y: number }> = {
   analytics: { x: 45, y: -20 },
   settings: { x: -20, y: -30 },
   antistress: { x: 15, y: 35 },
+  messenger: { x: -40, y: 15 },
 };
 
 export function getWindowLayout(

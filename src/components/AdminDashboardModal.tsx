@@ -57,7 +57,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           <div className="flex items-center justify-between p-4 border-b border-white/5 bg-slate-950/40">
             <div className="flex items-center gap-2">
               <Shield size={16} className="text-sky-400" />
-              <span className="text-xs font-black uppercase tracking-wider text-slate-300">Care OS Diagnostics</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-300">Диагностика</span>
             </div>
             <button
               onClick={() => { triggerHaptic(); onClose(); }}

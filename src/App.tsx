@@ -12,6 +12,7 @@ import { QuestsWindow } from './components/QuestsWindow';
 import { AnalyticsWindow } from './components/AnalyticsWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import { AntistressWindow } from './components/AntistressWindow';
+import { MessengerWindow } from './components/MessengerWindow';
 import { CarePackPopover } from './components/CarePackPopover';
 import { Onboarding } from './components/Onboarding';
 import { Dock } from './components/Dock';
@@ -64,6 +65,7 @@ export default function App() {
     burstPopIt,
     clickKeyboard,
     addDiaryEntry,
+    updateProfile,
   } = useGameState();
 
   const {
@@ -148,23 +150,44 @@ export default function App() {
         .from('player_profiles')
         .select('*');
       if (error) throw error;
-      setUsersList((data || []).map(row => ({ id: row.id, ...row.profile_data, nickname: row.profile_data?.nickname || row.id })));
+      setUsersList((data || []).map(row => ({ 
+        id: row.id, 
+        ...row.profile_data, 
+        nickname: row.profile_data?.nickname || row.id,
+        created_at: row.created_at
+      })));
     } catch (e) {
       console.error('Ошибка загрузки пользователей:', e);
     }
   }, []);
 
+  const syncStateRef = useRef({
+    profile,
+    isOnline,
+    isOfflineMode,
+    showConflictModal,
+    originalTriggerCloudSync
+  });
+
   useEffect(() => {
-    if (!profile) return;
-    syncIntervalRef.current = setInterval(() => {
-      if (isOnline && !isOfflineMode && !showConflictModal) {
-        originalTriggerCloudSync();
-      }
-    }, 60000);
-    return () => {
-      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+    syncStateRef.current = {
+      profile,
+      isOnline,
+      isOfflineMode,
+      showConflictModal,
+      originalTriggerCloudSync
     };
   }, [profile, isOnline, isOfflineMode, showConflictModal, originalTriggerCloudSync]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const state = syncStateRef.current;
+      if (state.profile && state.isOnline && !state.isOfflineMode && !state.showConflictModal) {
+        state.originalTriggerCloudSync();
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
@@ -186,6 +209,10 @@ export default function App() {
       return () => mediaQuery.removeEventListener('change', listener);
     }
   }, [profile?.theme]);
+
+  useEffect(() => {
+    fetchUsersList();
+  }, [fetchUsersList]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -366,16 +393,12 @@ export default function App() {
         onSync={handleManualSync}
         onOpenSettings={() => handleOpenWindow('settings')}
         onOpenAbout={() => handleOpenWindow('analytics')}
-        onCreatorClick={() => {
-          setClickCount(prev => prev + 1);
-          if (clickTimer) clearTimeout(clickTimer);
-          setClickTimer(setTimeout(() => {
-            setClickCount(0);
-          }, 2000));
-          if (clickCount >= 2) {
-            setClickCount(0);
+        onAppleClick={() => {
+          triggerHaptic();
+          if (isAdminMode) {
+            // Already open
+          } else {
             handleAdminLogin();
-            if (clickTimer) clearTimeout(clickTimer);
           }
         }}
         onStreakClick={() => {
@@ -398,88 +421,108 @@ export default function App() {
       <div className="absolute top-0 left-0 w-full h-full pt-9 pb-20 z-20 pointer-events-none">
         <div className="w-full h-full relative pointer-events-none">
           <AnimatePresence>
-            {openWindows.includes('cats') && !minimizedWindows.includes('cats') && (
-              <CatWindow
-                key="cats"
-                profile={profile}
-                activeCat={activeCat}
-                allSkins={allSkins}
-                onInteract={handleInteractionClick}
-                onSelectCat={selectActiveCat}
-                onClose={() => closeWindow('cats')}
-                onMinimize={() => minimizeWindow('cats')}
-                onAdoptClick={() => handleOpenWindow('cats')}
-                onPetClick={petCatClick}
-              />
+            {openWindows.includes('cats') && (
+              <div key="cats" className={minimizedWindows.includes('cats') ? 'hidden' : 'contents'}>
+                <CatWindow
+                  profile={profile}
+                  activeCat={activeCat}
+                  allSkins={allSkins}
+                  onInteract={handleInteractionClick}
+                  onSelectCat={selectActiveCat}
+                  onClose={() => closeWindow('cats')}
+                  onMinimize={() => minimizeWindow('cats')}
+                  onAdoptClick={() => handleOpenWindow('cats')}
+                  onPetClick={petCatClick}
+                />
+              </div>
             )}
 
-            {openWindows.includes('shop') && !minimizedWindows.includes('shop') && (
-              <ShopWindow
-                key="shop"
-                profile={profile}
-                activeCat={activeCat}
-                allSkins={allSkins}
-                onPurchase={purchaseSkinOrAccessory}
-                onApply={applySkinOrAccessory}
-                onDonatePaws={(amount) => addPaws(amount, true)}
-                onClose={() => closeWindow('shop')}
-                onMinimize={() => minimizeWindow('shop')}
-                onRedeemPromo={redeemPromoCode}
-              />
+            {openWindows.includes('shop') && (
+              <div key="shop" className={minimizedWindows.includes('shop') ? 'hidden' : 'contents'}>
+                <ShopWindow
+                  profile={profile}
+                  activeCat={activeCat}
+                  allSkins={allSkins}
+                  onPurchase={purchaseSkinOrAccessory}
+                  onApply={applySkinOrAccessory}
+                  onDonatePaws={(amount) => addPaws(amount, true)}
+                  onClose={() => closeWindow('shop')}
+                  onMinimize={() => minimizeWindow('shop')}
+                  onRedeemPromo={redeemPromoCode}
+                />
+              </div>
             )}
 
-            {openWindows.includes('quests') && !minimizedWindows.includes('quests') && (
-              <QuestsWindow
-                key="quests"
-                profile={profile}
-                activeCat={activeCat}
-                onInteract={handleInteractionClick}
-                onClaimReward={claimQuestReward}
-                onClaimMilestone={claimStreakMilestone}
-                onClose={() => closeWindow('quests')}
-                onMinimize={() => minimizeWindow('quests')}
-                initialTab={questsInitialTab}
-              />
+            {openWindows.includes('quests') && (
+              <div key="quests" className={minimizedWindows.includes('quests') ? 'hidden' : 'contents'}>
+                <QuestsWindow
+                  profile={profile}
+                  activeCat={activeCat}
+                  onInteract={handleInteractionClick}
+                  onClaimReward={claimQuestReward}
+                  onClaimMilestone={claimStreakMilestone}
+                  onClose={() => closeWindow('quests')}
+                  onMinimize={() => minimizeWindow('quests')}
+                  initialTab={questsInitialTab}
+                />
+              </div>
             )}
 
-            {openWindows.includes('analytics') && !minimizedWindows.includes('analytics') && (
-              <AnalyticsWindow
-                key="analytics"
-                profile={profile}
-                analytics={analytics}
-                usersList={usersList}
-                onClose={() => closeWindow('analytics')}
-                onMinimize={() => minimizeWindow('analytics')}
-              />
+            {openWindows.includes('analytics') && (
+              <div key="analytics" className={minimizedWindows.includes('analytics') ? 'hidden' : 'contents'}>
+                <AnalyticsWindow
+                  profile={profile}
+                  analytics={analytics}
+                  usersList={usersList}
+                  onClose={() => closeWindow('analytics')}
+                  onMinimize={() => minimizeWindow('analytics')}
+                />
+              </div>
             )}
 
-            {openWindows.includes('settings') && !minimizedWindows.includes('settings') && (
-              <SettingsWindow
-                key="settings"
-                profile={profile}
-                syncing={syncingState}
-                onSync={handleManualSync}
-                onUpdateNickname={updateNickname}
-                onUpdateTheme={updateThemePref}
-                onClaimReviewReward={claimReviewReward}
-                isOfflineMode={isOfflineMode}
-                setIsOfflineMode={setIsOfflineMode}
-                onClose={() => closeWindow('settings')}
-                onMinimize={() => minimizeWindow('settings')}
-              />
+            {openWindows.includes('settings') && (
+              <div key="settings" className={minimizedWindows.includes('settings') ? 'hidden' : 'contents'}>
+                <SettingsWindow
+                  profile={profile}
+                  syncing={syncingState}
+                  onSync={handleManualSync}
+                  onUpdateNickname={updateNickname}
+                  onUpdateTheme={updateThemePref}
+                  onClaimReviewReward={claimReviewReward}
+                  isOfflineMode={isOfflineMode}
+                  setIsOfflineMode={setIsOfflineMode}
+                  onClose={() => closeWindow('settings')}
+                  onMinimize={() => minimizeWindow('settings')}
+                />
+              </div>
             )}
 
-            {openWindows.includes('antistress') && !minimizedWindows.includes('antistress') && (
-              <AntistressWindow
-                key="antistress"
-                profile={profile}
-                onPopBurst={burstPopIt}
-                onKeyboardClick={clickKeyboard}
-                onClose={() => closeWindow('antistress')}
-                onMinimize={() => minimizeWindow('antistress')}
-                onAddPaws={(amount) => addPaws(amount, false)}
-                onAddDiaryEntry={addDiaryEntry}
-              />
+            {openWindows.includes('antistress') && (
+              <div key="antistress" className={minimizedWindows.includes('antistress') ? 'hidden' : 'contents'}>
+                <AntistressWindow
+                  profile={profile}
+                  onPopBurst={burstPopIt}
+                  onKeyboardClick={clickKeyboard}
+                  onClose={() => closeWindow('antistress')}
+                  onMinimize={() => minimizeWindow('antistress')}
+                  onAddPaws={(amount) => addPaws(amount, false)}
+                  onAddDiaryEntry={addDiaryEntry}
+                />
+              </div>
+            )}
+
+            {openWindows.includes('messenger') && (
+              <div key="messenger" className={minimizedWindows.includes('messenger') ? 'hidden' : 'contents'}>
+                <MessengerWindow
+                  profile={profile}
+                  onClose={() => closeWindow('messenger')}
+                  onMinimize={() => minimizeWindow('messenger')}
+                  onUpdateNickname={updateNickname}
+                  usersList={usersList}
+                  updateProfile={updateProfile}
+                  allSkins={allSkins}
+                />
+              </div>
             )}
           </AnimatePresence>
         </div>
@@ -617,22 +660,11 @@ export default function App() {
         </div>
       )}
 
-      <AnimatePresence>
-        {openWindows.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Dock
-              activeWindow={activeWindow}
-              minimizedWindows={minimizedWindows}
-              onOpenWindow={(id) => handleToggleWindow(id as WindowId)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Dock
+        activeWindow={activeWindow}
+        minimizedWindows={minimizedWindows}
+        onOpenWindow={(id) => handleToggleWindow(id as WindowId)}
+      />
 
       <CarePackPopover
         isOpen={careCategory !== null}

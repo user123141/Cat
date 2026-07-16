@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Cat, PlayerProfile, Skin } from '../types';
 import { CatRenderer } from './CatRenderer';
+import { NeedsCatRenderer } from './NeedsCatRenderer';
 import { Flame, Heart, Droplets, Bed, Award, PlusCircle } from 'lucide-react';
 import { playPetSound, triggerHapticLight, triggerHapticMedium } from '../utils/audio';
 import { INITIAL_SKINS } from '../hooks/useGameState';
@@ -42,7 +43,7 @@ export const CatWindow: React.FC<CatWindowProps> = ({
   onPetClick,
 }) => {
   const [particles, setParticles] = useState<ClickParticle[]>([]);
-  const [rightTab, setRightTab] = useState<'care' | 'grooming' | 'diary'>('care');
+  const [rightTab, setRightTab] = useState<'care' | 'diary'>('care');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const catStageRef = useRef<HTMLDivElement>(null);
@@ -266,23 +267,23 @@ export const CatWindow: React.FC<CatWindowProps> = ({
     petDistanceAccumulator.current = 0;
   };
 
-  const getActiveSkin = () => {
-    const skin = allSkins.find((s) => s.id === activeCat.skinId);
+  const getCatSkin = (cat: Cat) => {
+    const skin = allSkins.find((s) => s.id === cat.skinId);
     if (skin) {
       return { color: skin.color, patternColor: skin.patternColor, eyeColor: skin.eyeColor };
     }
-    if (activeCat.breed === 'Siamese') return { color: '#fef3c7', patternColor: '#78350f', eyeColor: '#06b6d4' };
-    if (activeCat.breed === 'British Shorthair') return { color: '#64748b', patternColor: '#475569', eyeColor: '#f59e0b' };
-    if (activeCat.breed === 'Sphynx') return { color: '#fda4af', patternColor: '#f43f5e', eyeColor: '#10b981' };
-    if (activeCat.breed === 'Persian') return { color: '#fef08a', patternColor: '#eab308', eyeColor: '#a855f7' };
-    if (activeCat.breed === 'Bombay') return { color: '#1e293b', patternColor: '#0f172a', eyeColor: '#f59e0b' };
-    if (activeCat.breed === 'Bengal') return { color: '#f59e0b', patternColor: '#78350f', eyeColor: '#10b981' };
-    if (activeCat.breed === 'Sakura Neko') return { color: '#fff1f2', patternColor: '#fda4af', eyeColor: '#ec4899' };
-    if (activeCat.breed === 'Galaxy Cat') return { color: '#312e81', patternColor: '#6366f1', eyeColor: '#a855f7' };
+    if (cat.breed === 'Siamese') return { color: '#fef3c7', patternColor: '#78350f', eyeColor: '#06b6d4' };
+    if (cat.breed === 'British Shorthair') return { color: '#64748b', patternColor: '#475569', eyeColor: '#f59e0b' };
+    if (cat.breed === 'Sphynx') return { color: '#fda4af', patternColor: '#f43f5e', eyeColor: '#10b981' };
+    if (cat.breed === 'Persian') return { color: '#fef08a', patternColor: '#eab308', eyeColor: '#a855f7' };
+    if (cat.breed === 'Bombay') return { color: '#1e293b', patternColor: '#0f172a', eyeColor: '#f59e0b' };
+    if (cat.breed === 'Bengal') return { color: '#f59e0b', patternColor: '#78350f', eyeColor: '#10b981' };
+    if (cat.breed === 'Sakura Neko') return { color: '#fff1f2', patternColor: '#fda4af', eyeColor: '#ec4899' };
+    if (cat.breed === 'Galaxy Cat') return { color: '#312e81', patternColor: '#6366f1', eyeColor: '#a855f7' };
     return { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
   };
 
-  const activeSkinColors = getActiveSkin();
+  const activeSkinColors = activeCat ? getCatSkin(activeCat) : { color: '#ffccd5', patternColor: '#ff85a1', eyeColor: '#0ea5e9' };
   const nextLevelXp = activeCat.level * 100;
   const xpPercentage = Math.min(100, (activeCat.xp / nextLevelXp) * 100);
 
@@ -304,18 +305,39 @@ export const CatWindow: React.FC<CatWindowProps> = ({
           <div className="flex items-center gap-1 p-1.5 overflow-x-auto no-scrollbar border-b border-white/5 bg-black/10 shrink-0">
             {profile.cats.map((cat) => {
               const isSelected = cat.id === activeCat.id;
+              const catColors = getCatSkin(cat);
               return (
                 <button
                   key={cat.id}
                   onClick={() => onSelectCat(cat.id)}
-                  className={`flex flex-col items-center justify-center gap-0 p-1 rounded-xl border-2 transition-all shrink-0 min-w-[50px] ${
+                  className={`flex flex-col items-center justify-center gap-0.5 p-1 rounded-xl border-2 transition-all shrink-0 min-w-[52px] ${
                     isSelected
                       ? 'border-sky-400 bg-sky-500/10'
                       : 'border-transparent bg-white/5 hover:bg-white/10'
                   }`}
                 >
-                  <span className="text-xl">🐱</span>
-                  <span className="text-[7px] font-bold text-slate-300 truncate max-w-[40px]">
+                  <div className="w-8 h-8 flex items-center justify-center overflow-hidden rounded-lg bg-black/20">
+                    <NeedsCatRenderer
+                      status={cat.status}
+                      hunger={cat.hunger}
+                      happiness={cat.happiness}
+                      cleanliness={cat.cleanliness}
+                      energy={cat.energy}
+                      breed={cat.breed}
+                      color={catColors.color}
+                      patternColor={catColors.patternColor}
+                      eyeColor={catColors.eyeColor}
+                      hat={cat.hat}
+                      glasses={cat.glasses}
+                      collar={cat.collar}
+                      scarf={cat.scarf}
+                      boots={cat.boots}
+                      wings={cat.wings}
+                      accessory={cat.accessory}
+                      size={28}
+                    />
+                  </div>
+                  <span className="text-[7px] font-bold text-slate-300 truncate max-w-[44px]">
                     {cat.name}
                   </span>
                   <span className="text-[6px] text-slate-400 font-mono">
@@ -340,17 +362,38 @@ export const CatWindow: React.FC<CatWindowProps> = ({
               <div className="space-y-1.5">
                 {profile.cats.map((cat) => {
                   const isSelected = cat.id === activeCat.id;
+                  const catColors = getCatSkin(cat);
                   return (
                     <button
                       key={cat.id}
                       onClick={() => onSelectCat(cat.id)}
-                      className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 text-left w-full ${
+                      className={`p-1.5 rounded-xl border transition-all cursor-pointer flex items-center gap-2 text-left w-full ${
                         isSelected
                           ? 'bg-sky-500/20 border-sky-500 text-sky-300'
                           : 'bg-white/5 border-transparent hover:bg-white/10 text-slate-300'
                       }`}
                     >
-                      <span className="text-lg">🐱</span>
+                      <div className="w-9 h-9 flex items-center justify-center overflow-hidden rounded-lg bg-black/20 shrink-0">
+                        <NeedsCatRenderer
+                          status={cat.status}
+                          hunger={cat.hunger}
+                          happiness={cat.happiness}
+                          cleanliness={cat.cleanliness}
+                          energy={cat.energy}
+                          breed={cat.breed}
+                          color={catColors.color}
+                          patternColor={catColors.patternColor}
+                          eyeColor={catColors.eyeColor}
+                          hat={cat.hat}
+                          glasses={cat.glasses}
+                          collar={cat.collar}
+                          scarf={cat.scarf}
+                          boots={cat.boots}
+                          wings={cat.wings}
+                          accessory={cat.accessory}
+                          size={32}
+                        />
+                      </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-[11px] font-bold truncate">{cat.name}</div>
                         <div className="text-[9px] text-slate-400 font-mono flex items-center gap-1">
@@ -385,16 +428,6 @@ export const CatWindow: React.FC<CatWindowProps> = ({
                   }`}
                 >
                   Забота
-                </button>
-                <button
-                  onClick={() => setRightTab('grooming')}
-                  className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
-                    rightTab === 'grooming'
-                      ? 'bg-sky-500 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Расческа 🪮
                 </button>
                 <button
                   onClick={() => setRightTab('diary')}

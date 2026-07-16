@@ -162,10 +162,10 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
         </div>
         <div className="text-[10px] font-mono text-slate-500 max-sm:hidden">
           {activeTab === 'stats' 
-            ? 'СТАТИСТИКА Care OS' 
+            ? 'СТАТИСТИКА' 
             : activeTab === 'achievements'
               ? `ОТКРЫТО ДОСТИЖЕНИЙ: ${achievements.filter(a => a.unlocked).length} / ${achievements.length}`
-              : 'РЕЙТИНГ ЛУЧШИХ Care OS'}
+              : 'РЕЙТИНГ ИГРОКОВ'}
         </div>
       </div>
 
@@ -293,7 +293,7 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
                   <LayoutGrid size={16} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-white mb-0.5">Умное удержание Care OS</h4>
+                  <h4 className="font-bold text-white mb-0.5">Умное удержание</h4>
                   <p className="text-[11px] text-slate-400 leading-normal">
                     Благодаря интерактивным виджетам на рабочем столе и динамической панели уведомлений Dynamic Island игроки своевременно узнают о нуждах своих котиков. Это делает заботу вовлекающей и ненавязчивой!
                   </p>

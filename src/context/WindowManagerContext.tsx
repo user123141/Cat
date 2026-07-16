@@ -1,7 +1,7 @@
 // src/context/WindowManagerContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-export type WindowId = 'cats' | 'shop' | 'quests' | 'analytics' | 'settings' | 'antistress' | 'calendar';
+export type WindowId = 'cats' | 'shop' | 'quests' | 'analytics' | 'settings' | 'antistress' | 'calendar' | 'messenger';
 
 export const Z_LAYERS = {
   BACKGROUND: 0,
@@ -86,16 +86,14 @@ export const WindowManagerProvider: React.FC<{ children: ReactNode }> = ({ child
   }, [openWindows, minimizedWindows, openWindow, minimizeWindow, focusWindow]);
 
   const getZIndex = useCallback((id: WindowId): number => {
-    if (activeWindow === id) {
-      return Z_LAYERS.WINDOW_FOCUSED;
-    }
     const index = windowOrder.indexOf(id);
     if (index === -1) {
       return Z_LAYERS.WINDOW_BASE;
     }
-    const maxOrder = Math.max(1, windowOrder.length);
-    const orderBonus = Math.floor((index / maxOrder) * 19);
-    return Z_LAYERS.WINDOW_BASE + orderBonus;
+    if (activeWindow === id) {
+      return Z_LAYERS.WINDOW_FOCUSED + windowOrder.length;
+    }
+    return Z_LAYERS.WINDOW_BASE + index;
   }, [activeWindow, windowOrder]);
 
   return (

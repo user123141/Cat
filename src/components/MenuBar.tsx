@@ -11,6 +11,7 @@ interface MenuBarProps {
   onSync: () => void;
   onOpenSettings: () => void;
   onOpenAbout: () => void;
+  onAppleClick: () => void;
   children?: React.ReactNode;
   onStreakClick?: () => void;
   isAdminMode?: boolean;
@@ -23,6 +24,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   onSync,
   onOpenSettings,
   onOpenAbout,
+  onAppleClick,
   children,
   onStreakClick,
   isAdminMode,
@@ -53,7 +55,13 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       
       {/* Левая часть */}
       <div className="flex items-center gap-1.5 flex-1 min-w-0 shrink-0">
-        <span className="text-sm cursor-pointer hover:opacity-75 active:scale-95 transition-all text-slate-900 dark:text-white px-0.5" onClick={onOpenAbout}></span>
+        <span 
+          className="text-sm cursor-pointer hover:opacity-75 active:scale-95 transition-all text-slate-900 dark:text-white px-1.5 py-0.5 rounded-md hover:bg-white/10 dark:hover:bg-black/10 font-bold" 
+          onClick={onAppleClick}
+          title="Панель администратора"
+        >
+          
+        </span>
         
         <button
           onClick={onSync}
@@ -83,31 +91,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         </div>
       )}
 
-      {/* Правая часть: статус сети */}
+      {/* Правая часть: пустая/чистая */}
       <div className="flex items-center gap-1.5 relative flex-1 justify-end min-w-0 shrink-0 overflow-visible">
-        <AnimatePresence>
-          {(!isOnline || (isOnline && showStatusIndicator)) && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, x: 10 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.8, x: 10 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/20 dark:bg-black/10 border border-white/20 dark:border-white/10"
-            >
-              {isOnline ? (
-                <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono text-[8px] font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span className="hidden xs:inline">Online</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-mono text-[8px] font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                  <span className="hidden xs:inline">Offline</span>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

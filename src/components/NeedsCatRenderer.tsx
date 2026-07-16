@@ -22,7 +22,7 @@ interface NeedsCatRendererProps {
   size?: number;
 }
 
-export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = ({
+export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = React.memo(({
   status,
   hunger,
   happiness,
@@ -130,27 +130,39 @@ export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = ({
     earRotateLeft = -12;
   }
 
-  const renderAccessories = () => {
+  const renderForegroundAccessories = () => {
     const items = [];
     if (hat) items.push(hat);
     if (glasses) items.push(glasses);
     if (collar) items.push(collar);
     if (scarf) items.push(scarf);
     if (boots) items.push(boots);
-    if (wings) items.push(wings);
-    if (accessory && !items.includes(accessory)) items.push(accessory);
+    
+    if (accessory && !items.includes(accessory)) {
+      const lower = accessory.toLowerCase();
+      const isWingAcc = lower.includes('wing') || lower.includes('крыл');
+      if (!isWingAcc) {
+        items.push(accessory);
+      }
+    }
+
     return items.map((item, idx) => (
       <g key={idx} transform="translate(50, 50) scale(0.5)">
-        <RenderAccessory value={item} scale={1} />
+        <RenderAccessory value={item} scale={1} isSleeping={isSleeping} />
       </g>
     ));
   };
 
-  if (isSleeping) {
-    // We no longer return a completely different, accessory-less static cat.
-    // Instead, we let the unified renderer below handle the sleeping state with closed eyes,
-    // so accessories, breeds, custom colors, and markings are perfectly preserved!
-  }
+  const activeWings = React.useMemo(() => {
+    if (wings) return wings;
+    if (accessory) {
+      const lower = accessory.toLowerCase();
+      if (lower.includes('wing') || lower.includes('крыл')) {
+        return accessory;
+      }
+    }
+    return null;
+  }, [wings, accessory]);
 
   return (
     <div style={{ width: size, height: size }} className={`relative flex items-center justify-center ${isSleeping ? 'animate-pulse' : ''}`}>
@@ -168,8 +180,17 @@ export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = ({
       )}
 
       <svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Floor shadow */}
         <ellipse cx="50" cy="85" rx="25" ry="5" fill="rgba(0,0,0,0.08)" />
 
+        {/* 🦋 BACKGROUND LAYER ACCESSORIES (WINGS!) */}
+        {activeWings && (
+          <g transform="translate(50, 50) scale(0.5)">
+            <RenderAccessory value={activeWings} scale={1} isSleeping={isSleeping} />
+          </g>
+        )}
+
+        {/* Tail */}
         <path
           d="M72 70C82 70 87 55 85 45C83 37 77 37 75 42C72 47 77 62 67 72"
           stroke={color}
@@ -182,12 +203,15 @@ export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = ({
           }}
         />
 
+        {/* Body */}
         <path d="M25 78C25 58 32 48 50 48C68 48 75 58 75 78C75 88 68 90 50 90C32 90 25 88 25 78Z" fill={color} />
         <ellipse cx="37" cy="86" rx="7" ry="5" fill={color} />
         <ellipse cx="63" cy="86" rx="7" ry="5" fill={color} />
 
+        {/* Head */}
         <path d="M29 38C29 24 37 19 50 19C63 19 71 24 71 38C71 51 62 52 50 52C38 52 29 51 29 38Z" fill={color} />
 
+        {/* Ears */}
         <path
           d="M31 24L21 6C20 4 23 6 29 15L31 24Z"
           fill={color}
@@ -207,6 +231,7 @@ export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = ({
           }}
         />
 
+        {/* Eyes */}
         {isSleeping || activity === 'blinking' ? (
           <>
             <path d="M37 36C39 37.5 41 37.5 43 36" stroke="rgba(0,0,0,0.7)" strokeWidth="2.5" strokeLinecap="round" />
@@ -233,19 +258,23 @@ export const NeedsCatRenderer: React.FC<NeedsCatRendererProps> = ({
           </>
         )}
 
+        {/* Blush */}
         <circle cx="34" cy="42" r="3" fill="#fda4af" opacity="0.6" />
         <circle cx="66" cy="42" r="3" fill="#fda4af" opacity="0.6" />
 
+        {/* Nose */}
         <path d="M48 41L52 41L50 43Z" fill="#fda4af" stroke="#f43f5e" strokeWidth="0.5" />
 
+        {/* Mouth */}
         {isSad ? (
           <path d="M47 47C48 45.5 52 45.5 53 47" stroke="rgba(0,0,0,0.7)" strokeWidth="2" strokeLinecap="round" />
         ) : (
           <path d="M47 45C48 46.5 50 46.5 50 45C50 46.5 52 46.5 53 45" stroke="rgba(0,0,0,0.7)" strokeWidth="2" strokeLinecap="round" />
         )}
 
-        {renderAccessories()}
+        {/* 👒 FOREGROUND LAYER ACCESSORIES (HATS, GLASSES, COLLARS) */}
+        {renderForegroundAccessories()}
       </svg>
     </div>
   );
-};
+});

@@ -1,7 +1,7 @@
 // src/components/Dock.tsx
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat } from 'lucide-react';
+import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat, MessageCircle } from 'lucide-react';
 
 interface DockProps {
   activeWindow: string | null;
@@ -10,21 +10,39 @@ interface DockProps {
 }
 
 export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOpenWindow }) => {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkPlatform = () => {
+      setIsMobile(window.innerWidth < 1024); // Smartphones and tablets
+    };
+    checkPlatform();
+    window.addEventListener('resize', checkPlatform);
+    return () => window.removeEventListener('resize', checkPlatform);
+  }, []);
+
   const dockItems = [
     { id: 'cats', label: 'Котята', icon: <Cat size={26} className="text-slate-700 dark:text-slate-300" /> },
     { id: 'antistress', label: 'Антистресс', icon: <Sparkles size={26} className="text-amber-500" /> },
     { id: 'shop', label: 'Магазин', icon: <ShoppingBag size={26} className="text-purple-600 dark:text-purple-400" /> },
     { id: 'quests', label: 'Задания', icon: <Target size={26} className="text-rose-500" /> },
+    { id: 'messenger', label: 'Мессенджер', icon: <MessageCircle size={26} className="text-sky-500 animate-pulse" /> },
     { id: 'analytics', label: 'Аналитика', icon: <TrendingUp size={26} className="text-emerald-500" /> },
     { id: 'settings', label: 'Настройки', icon: <Settings size={26} className="text-slate-600 dark:text-slate-300" /> },
   ];
 
+  const shouldHide = isMobile && activeWindow && !minimizedWindows.includes(activeWindow);
+
   return (
-    <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none z-40 select-none px-2">
+    <div className="fixed bottom-2 left-0 right-0 flex justify-center pointer-events-none z-40 select-none px-2 overflow-visible">
       <motion.div
-        initial={{ y: 50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.5 }}
+        initial={{ y: 120, opacity: 0 }}
+        animate={{ 
+          y: shouldHide ? 150 : 0, 
+          opacity: shouldHide ? 0 : 1,
+          pointerEvents: shouldHide ? 'none' : 'auto'
+        }}
+        transition={{ type: 'spring', stiffness: 260, damping: 24 }}
         className="pointer-events-auto flex items-end gap-2 md:gap-3.5 px-2 md:px-3 py-2 md:py-3.5 rounded-[20px] md:rounded-[26px] bg-white/25 dark:bg-black/25 backdrop-blur-xl border border-white/30 dark:border-white/15 shadow-lg relative max-w-full overflow-x-auto no-scrollbar"
       >
         {dockItems.map((item) => {

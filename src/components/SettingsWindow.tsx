@@ -132,73 +132,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
       subtitle="Настройки"
     >
       <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-900/40 space-y-4">
-        {/* Профиль */}
-        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
-          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <User size={14} className="text-sky-400" />
-            Профиль Опекуна
-          </h3>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={nicknameInput}
-              onChange={(e) => setNicknameInput(e.target.value)}
-              maxLength={16}
-              placeholder="Имя опекуна"
-              className="flex-1 px-3 py-1.5 text-xs font-bold rounded-xl bg-black/35 border border-white/10 text-white focus:outline-none focus:border-sky-500 transition-all font-sans"
-            />
-            <button
-              onClick={handleNicknameSave}
-              className="px-3 py-1.5 text-xs font-bold rounded-xl bg-sky-500 hover:bg-sky-600 text-white transition-all active:scale-95 cursor-pointer shrink-0"
-            >
-              Сохранить
-            </button>
-          </div>
-        </div>
-
-        {/* Тема */}
-        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
-          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Sun size={14} className="text-sky-400" />
-            Тема оформления
-          </h3>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              onClick={() => onUpdateTheme('light')}
-              className={`py-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
-                profile.theme === 'light'
-                  ? 'bg-sky-500/25 border-sky-500 text-white'
-                  : 'bg-black/25 border-transparent text-slate-400 hover:bg-black/35 hover:text-slate-200'
-              }`}
-            >
-              <Sun size={12} />
-              <span>Светлая</span>
-            </button>
-            <button
-              onClick={() => onUpdateTheme('dark')}
-              className={`py-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
-                profile.theme === 'dark'
-                  ? 'bg-sky-500/25 border-sky-500 text-white'
-                  : 'bg-black/25 border-transparent text-slate-400 hover:bg-black/35 hover:text-slate-200'
-              }`}
-            >
-              <Moon size={12} />
-              <span>Темная</span>
-            </button>
-            <button
-              onClick={() => onUpdateTheme('auto')}
-              className={`py-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all cursor-pointer ${
-                profile.theme === 'auto'
-                  ? 'bg-sky-500/25 border-sky-500 text-white'
-                  : 'bg-black/25 border-transparent text-slate-400 hover:bg-black/35 hover:text-slate-200'
-              }`}
-            >
-              <Monitor size={12} />
-              <span>Авто</span>
-            </button>
-          </div>
-        </div>
-
         {/* Push-уведомления */}
         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -240,7 +173,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
               <div>
                 <h4 className="text-xs font-black text-white flex items-center gap-1.5">Бонус за отзыв об игре! ⭐️</h4>
                 <p className="text-[10px] text-slate-300 leading-normal max-w-sm">
-                  Оставьте отзыв о нашей игре Care OS! Вы получите <span className="font-extrabold text-amber-400">+100 лапок 🐾</span>.
+                  Оставьте отзыв о нашей игре! Вы получите <span className="font-extrabold text-amber-400">+100 лапок 🐾</span>.
                 </p>
               </div>
             </div>
@@ -345,7 +278,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-t border-white/5 pt-4 text-[10px]">
           <div className="flex items-center gap-1.5 text-slate-400 text-left">
             <Sparkles size={12} className="text-amber-400" />
-            <span>Главный дизайнер и разработчик Care OS: <strong className="text-slate-300">Maksym Skorina</strong></span>
+            <span>Главный дизайнер и разработчик: <strong className="text-slate-300">Maksym Skorina</strong></span>
           </div>
           <button
             onClick={handleReset}

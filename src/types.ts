@@ -121,6 +121,8 @@ export interface PlayerProfile {
   energyCount?: number;
   lastSavedTime?: number;
   inventory?: Record<string, number>;
+  selectedBadge?: string;
+  badgeList?: string[];
 }
 
 export interface ConsumableItem {

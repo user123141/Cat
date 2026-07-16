@@ -164,6 +164,11 @@ export const useGameState = () => {
     try {
       const parsed: PlayerProfile = JSON.parse(savedProfile);
       
+      if (!parsed.id) {
+        parsed.id = 'usr_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
+        localStorage.setItem('maccat_profile', JSON.stringify(parsed));
+      }
+      
       if (!parsed.unlockedAchievements) parsed.unlockedAchievements = [];
       if (!parsed.currentWallpaper) parsed.currentWallpaper = 'ventura';
       if (parsed.claimedReviewReward === undefined) parsed.claimedReviewReward = false;
@@ -466,6 +471,7 @@ export const useGameState = () => {
     };
 
     const newProfile: PlayerProfile = {
+      id: 'usr_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36),
       nickname,
       avatar: '🐱',
       paws: 150,
@@ -1448,5 +1454,6 @@ export const useGameState = () => {
     updateThemePref,
     removeNotification,
     addDiaryEntry,
+    updateProfile,
   };
 };

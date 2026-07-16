@@ -65,7 +65,7 @@ export const MacCatWindowFrame: React.FC<MacCatWindowFrameProps> = ({
       dragElastic={isMobile ? { top: 0.05, bottom: 0.5 } : 0.05}
       dragMomentum={false}
       onDragEnd={handleDragEnd}
-      onPointerDown={() => focusWindow(id as WindowId)}
+      onPointerDownCapture={() => focusWindow(id as WindowId)}
       style={{
         zIndex: isMobile ? 45 + currentZ : currentZ,
         width: layout.width,

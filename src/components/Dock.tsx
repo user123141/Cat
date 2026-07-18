@@ -1,7 +1,7 @@
 // src/components/Dock.tsx
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat, MessageCircle } from 'lucide-react';
+import { ShoppingBag, Target, Settings, TrendingUp, Sparkles, Cat, MessageCircle, Palette } from 'lucide-react';
 
 interface DockProps {
   activeWindow: string | null;
@@ -25,6 +25,7 @@ export const Dock: React.FC<DockProps> = ({ activeWindow, minimizedWindows, onOp
     { id: 'cats', label: 'Котята', icon: <Cat size={26} className="text-slate-700 dark:text-slate-300" /> },
     { id: 'antistress', label: 'Антистресс', icon: <Sparkles size={26} className="text-amber-500" /> },
     { id: 'shop', label: 'Магазин', icon: <ShoppingBag size={26} className="text-purple-600 dark:text-purple-400" /> },
+    { id: 'wardrobe', label: 'Шкафчик', icon: <Palette size={26} className="text-pink-500" /> },
     { id: 'quests', label: 'Задания', icon: <Target size={26} className="text-rose-500" /> },
     { id: 'messenger', label: 'Мессенджер', icon: <MessageCircle size={26} className="text-sky-500 animate-pulse" /> },
     { id: 'analytics', label: 'Аналитика', icon: <TrendingUp size={26} className="text-emerald-500" /> },

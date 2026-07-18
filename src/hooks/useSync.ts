@@ -1,245 +1,174 @@
-// src/hooks/useSync.ts
-import { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { PlayerProfile } from '../types';
 import { GameLogger } from '../utils/GameLogger';
-import { supabase } from '../supabase';
+import { supabase, saveProfileToSupabase, loadProfileFromSupabase } from '../supabase';
 import { smartMergeProfiles } from '../game/merge';
 
 export const useSync = (
   profile: PlayerProfile | null,
-  updateProfile: (updater: (prev: PlayerProfile | null) => PlayerProfile | null) => void,
-  addNotification: (title: string, message: string, type: 'info' | 'success' | 'warning' | 'paw') => void,
+  setProfile: React.Dispatch<React.SetStateAction<PlayerProfile | null>>,
   isOnline: boolean,
   isOfflineMode: boolean
 ) => {
   const [syncing, setSyncing] = useState(false);
   const [syncLog, setSyncLog] = useState<string[]>([]);
   const [lastSyncedTime, setLastSyncedTime] = useState<number>(0);
-
-  // Conflict modal state
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictCloudData, setConflictCloudData] = useState<PlayerProfile | null>(null);
   const [conflictLocalData, setConflictLocalData] = useState<PlayerProfile | null>(null);
 
-  const profileRef = useRef<PlayerProfile | null>(null);
-  profileRef.current = profile;
+  const lastProfileHashRef = useRef<string>('');
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Web Worker Ref
-  const workerRef = useRef<Worker | null>(null);
+  const getProfileHash = (p: PlayerProfile) => JSON.stringify(p);
 
-  // Initialize Web Worker and authenticate it with credentials
-  useEffect(() => {
-    try {
-      const worker = new Worker(new URL('../sync.worker.ts', import.meta.url), { type: 'module' });
-      workerRef.current = worker;
+  const performSync = useCallback(async () => {
+    const currentProfile = profile;
+    if (!currentProfile || !supabase || !isOnline || isOfflineMode) return;
 
-      const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-      const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
-
-      if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-        worker.postMessage({
-          type: 'INIT',
-          payload: { url: SUPABASE_URL, key: SUPABASE_ANON_KEY }
-        });
-      }
-    } catch (e) {
-      console.error('Failed to initialize Sync Web Worker:', e);
-    }
-
-    return () => {
-      workerRef.current?.terminate();
-    };
-  }, []);
-
-  // Helper to run background tasks with Web Worker
-  const runWorkerTask = useCallback((type: 'SAVE_PROFILE' | 'LOAD_PROFILE', payload: any): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      const worker = workerRef.current;
-      if (!worker) {
-        reject(new Error('Sync Web Worker is not active'));
-        return;
-      }
-
-      const handleMessage = (e: MessageEvent) => {
-        const { type: resType, data, error } = e.data;
-        
-        if (resType === 'SAVE_SUCCESS' && type === 'SAVE_PROFILE') {
-          worker.removeEventListener('message', handleMessage);
-          resolve(true);
-        } else if (resType === 'LOAD_SUCCESS' && type === 'LOAD_PROFILE') {
-          worker.removeEventListener('message', handleMessage);
-          resolve(data);
-        } else if (resType === 'SAVE_FAIL' || resType === 'LOAD_FAIL' || resType === 'INIT_FAIL') {
-          worker.removeEventListener('message', handleMessage);
-          reject(new Error(error || 'Worker task failed'));
-        }
-      };
-
-      worker.addEventListener('message', handleMessage);
-      worker.postMessage({ type, payload });
-    });
-  }, []);
-
-  const triggerCloudSync = useCallback(async (isAutoSync = false) => {
-    const currentProfile = profileRef.current;
-    if (!currentProfile) return;
-
-    if (!supabase) {
-      GameLogger.log('warn', 'Синхронизация не настроена (отсутствуют ключи в .env). Прогресс сохранен локально.');
-      const timeStr = new Date().toLocaleTimeString();
-      setSyncLog(prev => [`[${timeStr}] ⚠️ Сервер синхронизации не подключен. Работает локальное автосохранение.`, ...prev]);
-      return;
-    }
-
-    const online = isOnline && navigator.onLine;
-    if (!online || isOfflineMode) {
-      GameLogger.log('warn', `Синхронизация отклонена: оффлайн-режим (isOfflineMode=${isOfflineMode}, isOnline=${isOnline})`);
-      if (!isAutoSync) {
-        addNotification('Сбой сети 🌐', 'В данный момент вы оффлайн. Прогресс сохранен в локальный кэш.', 'warning');
-      }
-      const timeStr = new Date().toLocaleTimeString();
-      setSyncLog(prev => [`[${timeStr}] ⚠️ Оффлайн – синхронизация отложена.`, ...prev]);
-      return;
-    }
+    const currentHash = getProfileHash(currentProfile);
+    if (currentHash === lastProfileHashRef.current) return;
 
     setSyncing(true);
-    GameLogger.log('info', `[Worker Thread] Начало синхронизации профиля ${currentProfile.nickname} (ID: ${currentProfile.id})...`);
-    if (!isAutoSync) {
-      addNotification('Сохранение...', 'Подключение к серверу...', 'info');
-    }
-    const timeStr = new Date().toLocaleTimeString();
-    setSyncLog(prev => [`[${timeStr}] 📡 Отправка задачи в фоновый Web Worker...`, ...prev]);
+    const uid = currentProfile.id || currentProfile.nickname;
 
     try {
-      const uid = currentProfile.id || currentProfile.nickname;
-      
-      // Load cloud profile in background Web Worker
-      const cloudProfile = await runWorkerTask('LOAD_PROFILE', { userId: uid });
-
+      const cloudProfile = await loadProfileFromSupabase(uid);
       if (cloudProfile) {
-        GameLogger.log('info', 'Профиль обнаружен в облаке. Проверка на конфликты...');
-        
-        // Conflict check: cloud profile has more paws, more cats, or more xp
+        const isAdminAction = 
+          cloudProfile.blocked !== currentProfile.blocked ||
+          cloudProfile.blockedUntil !== currentProfile.blockedUntil ||
+          cloudProfile.isAdmin !== currentProfile.isAdmin ||
+          JSON.stringify(cloudProfile.badgeList || []) !== JSON.stringify(currentProfile.badgeList || []) ||
+          cloudProfile.selectedBadge !== currentProfile.selectedBadge ||
+          cloudProfile.paws !== currentProfile.paws ||
+          cloudProfile.nickname !== currentProfile.nickname;
+
+        if (isAdminAction) {
+          setProfile(cloudProfile);
+          lastProfileHashRef.current = getProfileHash(cloudProfile);
+          setSyncing(false);
+          return;
+        }
+
         const isConflict =
-          (cloudProfile.paws > currentProfile.paws) ||
+          (cloudProfile.paws > currentProfile.paws + 50) ||
           (cloudProfile.cats.length > currentProfile.cats.length) ||
-          cloudProfile.cats.some((cc: any) => {
+          cloudProfile.cats.some((cc) => {
             const lc = currentProfile.cats.find(cat => cat.id === cc.id);
-            if (!lc) return true;
-            if (cc.level > lc.level) return true;
-            if (cc.level === lc.level && cc.xp > lc.xp) return true;
-            return false;
+            return !lc || cc.level > lc.level + 1 || (cc.level === lc.level && cc.xp > lc.xp + 50);
           }) ||
-          (cloudProfile.unlockedSkins && cloudProfile.unlockedSkins.some((s: string) => !currentProfile.unlockedSkins.includes(s)));
+          (cloudProfile.unlockedSkins && cloudProfile.unlockedSkins.some((s) => !currentProfile.unlockedSkins.includes(s)));
 
         if (isConflict) {
-          GameLogger.log('warn', `Обнаружен конфликт версий! В облаке paws=${cloudProfile.paws}, локальные paws=${currentProfile.paws}.`);
-          setSyncing(false);
-          const timeConflict = new Date().toLocaleTimeString();
-          setSyncLog(prev => [`[${timeConflict}] ⚠️ Обнаружена рассинхронизация с облачным сохранением!`, ...prev]);
-
           setConflictCloudData(cloudProfile);
           setConflictLocalData(currentProfile);
           setShowConflictModal(true);
-          addNotification('Конфликт данных! ⚠️', 'Обнаружены разные сохранения в облаке и на этом устройстве.', 'warning');
+          setSyncing(false);
           return;
         }
       }
 
-      // No conflict, proceed with upsert via Web Worker
-      const success = await runWorkerTask('SAVE_PROFILE', { userId: uid, profile: currentProfile });
-      setSyncing(false);
-
+      const success = await saveProfileToSupabase(uid, currentProfile);
       if (success) {
+        lastProfileHashRef.current = currentHash;
         setLastSyncedTime(Date.now());
-        const tSuccess = new Date().toLocaleTimeString();
-        setSyncLog(prev => [`[${tSuccess}] ✅ Прогресс успешно сохранен в облаке через Web Worker.`, ...prev]);
-        if (!isAutoSync) {
-          addNotification('Успешно сохранено ✨', 'Игровой процесс сохранен в облачном профиле.', 'success');
-        }
-      } else {
-        const tFail = new Date().toLocaleTimeString();
-        setSyncLog(prev => [`[${tFail}] ❌ Не удалось сохранить данные в облаке.`, ...prev]);
-        if (!isAutoSync) {
-          addNotification('Синхронизация отложена', 'Локальные данные в безопасности.', 'warning');
-        }
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
+    } finally {
       setSyncing(false);
-      const tError = new Date().toLocaleTimeString();
-      setSyncLog(prev => [`[${tError}] ❌ Сбой Web Worker: ${e.message || e}`, ...prev]);
-      if (!isAutoSync) {
-        addNotification('Сбой синхронизации', 'Облако временно недоступно.', 'warning');
+    }
+  }, [profile, isOnline, isOfflineMode]);
+
+  const queueSync = useCallback(() => {
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      performSync();
+    }, 300);
+  }, [performSync]);
+
+  const triggerCloudSync = useCallback(async () => {
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    await performSync();
+  }, [performSync]);
+
+  // Automatically queue silent sync whenever profile is updated
+  useEffect(() => {
+    if (profile) {
+      const currentHash = getProfileHash(profile);
+      if (currentHash !== lastProfileHashRef.current) {
+        queueSync();
       }
     }
-  }, [profile, isOnline, isOfflineMode, addNotification, runWorkerTask]);
+  }, [profile, queueSync]);
 
   const resolveConflict = useCallback(async (choice: 'local' | 'cloud' | 'merge') => {
     if (!conflictLocalData || !conflictCloudData) {
       setShowConflictModal(false);
       return;
     }
-
     const uid = conflictLocalData.id || conflictLocalData.nickname;
-    setSyncing(true);
+    const resolvedProfile = choice === 'local'
+      ? conflictLocalData
+      : choice === 'cloud'
+      ? conflictCloudData
+      : smartMergeProfiles(conflictLocalData, conflictCloudData);
+
+    setProfile(() => resolvedProfile);
+    await saveProfileToSupabase(uid, resolvedProfile);
+    lastProfileHashRef.current = getProfileHash(resolvedProfile);
+    setLastSyncedTime(Date.now());
     setShowConflictModal(false);
+    setConflictCloudData(null);
+    setConflictLocalData(null);
+  }, [conflictLocalData, conflictCloudData, setProfile]);
 
-    try {
-      let resolvedProfile: PlayerProfile;
-
-      if (choice === 'local') {
-        resolvedProfile = conflictLocalData;
-        GameLogger.log('info', 'Выбран локальный профиль. Перезапись облачной резервной копии...');
-        setSyncLog(prev => [`[${new Date().toLocaleTimeString()}] 💾 Перезапись облачной копии локальной версией...`, ...prev]);
-      } else if (choice === 'cloud') {
-        resolvedProfile = conflictCloudData;
-        GameLogger.log('info', 'Выбран резервный профиль. Восстановление локальной версии...');
-        setSyncLog(prev => [`[${new Date().toLocaleTimeString()}] ☁️ Восстановление прогресса из облака...`, ...prev]);
-      } else {
-        resolvedProfile = smartMergeProfiles(conflictLocalData, conflictCloudData);
-        GameLogger.log('info', 'Выбран умный гибридный режим слияния прогрессов.');
-        setSyncLog(prev => [`[${new Date().toLocaleTimeString()}] 🔀 Умное объединение версий прогресса...`, ...prev]);
-      }
-
-      updateProfile(() => resolvedProfile);
-      
-      // Save the resolved profile through Web Worker
-      const success = await runWorkerTask('SAVE_PROFILE', { userId: uid, profile: resolvedProfile });
-      setSyncing(false);
-
-      if (success) {
-        setLastSyncedTime(Date.now());
-        addNotification('Конфликт разрешен ✅', 'Прогресс успешно объединен и сохранен в облаке.', 'success');
-        setSyncLog(prev => [`[${new Date().toLocaleTimeString()}] ✅ Синхронизация восстановлена.`, ...prev]);
-      } else {
-        addNotification('Ошибка сохранения', 'Прогресс обновлен локально, но не сохранен в облаке.', 'warning');
-      }
-    } catch (e) {
-      console.error(e);
-      setSyncing(false);
-      addNotification('Ошибка синхронизации', 'Не удалось разрешить конфликт версий.', 'warning');
-    } finally {
-      setConflictCloudData(null);
-      setConflictLocalData(null);
-    }
-  }, [conflictCloudData, conflictLocalData, updateProfile, addNotification, runWorkerTask]);
-
-  const simulateConflictDeviceSwitch = useCallback(() => {
-    if (!profile) return;
-    const fakeCloud: PlayerProfile = {
-      ...profile,
-      paws: profile.paws + 120,
-      totalInteractions: (profile.totalInteractions || 0) + 15,
-      cats: profile.cats.map((cat, idx) => 
-        idx === 0 ? { ...cat, level: cat.level + 1, xp: 0 } : cat
-      ),
+  useEffect(() => {
+    if (!profile?.id || !supabase || !isOnline || isOfflineMode) return;
+    const channel = supabase
+      .channel(`profile_sync_${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'player_profiles',
+          filter: `id=eq.${profile.id}`
+        },
+        (payload) => {
+          const newData = payload.new?.profile_data as PlayerProfile;
+          if (newData) {
+            setProfile(newData);
+            lastProfileHashRef.current = getProfileHash(newData);
+          }
+        }
+      )
+      .on(
+        'broadcast',
+        { event: 'cache_invalidate' },
+        (payload) => {
+          if (payload.payload?.userId === profile.id) {
+            loadProfileFromSupabase(profile.id).then((fresh) => {
+              if (fresh) {
+                setProfile(fresh);
+                lastProfileHashRef.current = getProfileHash(fresh);
+              }
+            });
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
     };
-    setConflictCloudData(fakeCloud);
-    setConflictLocalData(profile);
-    setShowConflictModal(true);
-    addNotification('Конфликт симулирован ⚠️', 'Отображено окно выбора версии сохранения.', 'warning');
-  }, [profile, addNotification]);
+  }, [profile?.id, isOnline, isOfflineMode, setProfile]);
+
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, []);
 
   return {
     syncing,
@@ -250,7 +179,13 @@ export const useSync = (
     conflictCloudData,
     conflictLocalData,
     triggerCloudSync,
+    queueSync,
     resolveConflict,
-    simulateConflictDeviceSwitch,
+    simulateConflictDeviceSwitch: () => {
+      if (!profile) return;
+      setConflictCloudData({ ...profile, paws: profile.paws + 200 });
+      setConflictLocalData(profile);
+      setShowConflictModal(true);
+    }
   };
 };

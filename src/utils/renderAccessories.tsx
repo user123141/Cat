@@ -1,9 +1,10 @@
 // src/utils/renderAccessories.tsx
 import React from 'react';
 
-// Set для отслеживания уже залогированных неизвестных аксессуаров
+// Кэш для уже залогированных неизвестных аксессуаров
 const loggedUnknown = new Set<string>();
 
+// Определение цвета аксессуара на основе его названия
 export function getAccessoryColor(acc: string): string {
   const lower = acc.toLowerCase();
   if (lower.includes('розов') || lower.includes('pink') || lower.includes('rose')) return '#ec4899';
@@ -22,6 +23,7 @@ export function getAccessoryColor(acc: string): string {
   return '#94a3b8';
 }
 
+// Базовые точки привязки (в координатах SVG 200x200)
 const ANCHORS = {
   HEAD: { x: 0, y: -58 },
   NECK: { x: 0, y: 8 },
@@ -31,29 +33,34 @@ const ANCHORS = {
   HAIR: { x: 40, y: -70 },
 };
 
+// ==================== КОМПОНЕНТЫ АКСЕССУАРОВ ====================
+
+// Базовый контейнер для головных уборов
 const HatBase: React.FC<{ color: string; isSleeping?: boolean; children: React.ReactNode }> = ({ color, isSleeping, children }) => {
   const transformStr = `translate(${ANCHORS.HEAD.x}, ${ANCHORS.HEAD.y})`;
-  return (
-    <g transform={transformStr}>
-      {children}
-    </g>
-  );
+  return <g transform={transformStr}>{children}</g>;
 };
 
-// Компоненты аксессуаров (оставляем без изменений)
+// КОРОНА
 const CrownAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, -10)">
     <path d="M-36 -12L-28 -28L-8 -20L0 -34L8 -20L28 -28L36 -12H-36Z" fill="#fbbf24" stroke="#d97706" strokeWidth="2" strokeLinejoin="round" />
+    <circle cx="-20" cy="-18" r="2" fill="#ef4444" />
+    <circle cx="0" cy="-22" r="2.5" fill="#3b82f6" />
+    <circle cx="20" cy="-18" r="2" fill="#ef4444" />
   </g>
 );
 
+// НИМБ
 const HaloAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, -20)">
     <ellipse cx="0" cy="0" rx="48" ry="12" fill="none" stroke="#fef08a" strokeWidth="4" opacity="0.9" />
     <line x1="0" y1="6" x2="0" y2="30" stroke="#fef08a" strokeWidth="2" opacity="0.5" />
+    <circle cx="0" cy="0" r="4" fill="#fef08a" opacity="0.3" />
   </g>
 );
 
+// ШАПКА САНТЫ
 const SantaHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <path d="M-28 0L-10 -35L18 -42L25 -30L20 0Z" fill="#ef4444" />
@@ -62,6 +69,7 @@ const SantaHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ДЕТЕКТИВНАЯ ШЛЯПА
 const DetectiveHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <path d="M-36 0C-36 -30 36 -30 36 0Z" fill="#a1a1aa" stroke="#71717a" strokeWidth="1" />
@@ -70,6 +78,7 @@ const DetectiveHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ПРАЗДНИЧНЫЙ КОЛПАК
 const PartyHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <path d="M-20 0L0 -45L20 0Z" fill={color} />
@@ -80,6 +89,7 @@ const PartyHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// КОЛПАК ВОЛШЕБНИКА
 const WizardHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <path d="M-45 0C-20 -5 20 -5 45 0L0 -60L-45 0Z" fill="#6366f1" />
@@ -89,6 +99,7 @@ const WizardHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ЦИЛИНДР
 const TopHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <rect x="-24" y="-35" width="48" height="35" fill={color} />
@@ -97,6 +108,7 @@ const TopHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ФЕДОРА
 const FedoraAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <ellipse cx="0" cy="0" rx="30" ry="8" fill={color} />
@@ -106,6 +118,7 @@ const FedoraAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ШАПКА (BEANIE)
 const BeanieAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <path d="M-30 -5C-30 -25 30 -25 30 -5V10H-30V-5Z" fill={color} />
@@ -113,6 +126,7 @@ const BeanieAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// УШАНКА
 const UshankaAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <path d="M-35 -5C-35 -20 35 -20 35 -5V10H-35V-5Z" fill={color} />
@@ -121,6 +135,7 @@ const UshankaAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ШЛЕМ
 const HelmetAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <path d="M-30 -5C-30 -30 30 -30 30 -5V15H-30V-5Z" fill={color} />
@@ -129,14 +144,17 @@ const HelmetAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ПИРАТСКАЯ ШЛЯПА
 const PirateHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <path d="M-40 0C-40 -20 40 -20 40 0Z" fill={color} />
     <rect x="-10" y="-30" width="20" height="30" fill={color} />
     <path d="M-15 -30L15 -30L10 -25L-10 -25Z" fill="#fff" />
+    <circle cx="0" cy="-15" r="2" fill="#ef4444" />
   </g>
 );
 
+// КОВБОЙСКАЯ ШЛЯПА
 const CowboyHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform="translate(0, 0)">
     <ellipse cx="0" cy="0" rx="35" ry="6" fill={color} />
@@ -145,11 +163,12 @@ const CowboyHatAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
-// ----- Остальные аксессуары -----
+// ОЧКИ
 const GlassesAccessory: React.FC<{ color: string; isSleeping?: boolean }> = ({ color, isSleeping }) => {
   const transformStr = `translate(${ANCHORS.EYES.x}, ${ANCHORS.EYES.y})`;
+  const opacity = isSleeping ? 0.3 : 1;
   return (
-    <g transform={transformStr}>
+    <g transform={transformStr} opacity={opacity}>
       <path d="M-56 -2C-56 -2 -44 5 -24 0" stroke={color} strokeWidth="8" strokeLinecap="round" />
       <path d="M24 0C24 0 36 5 56 -2" stroke={color} strokeWidth="8" strokeLinecap="round" />
       <line x1="-24" y1="-1" x2="24" y2="-1" stroke={color} strokeWidth="4" />
@@ -159,10 +178,12 @@ const GlassesAccessory: React.FC<{ color: string; isSleeping?: boolean }> = ({ c
   );
 };
 
+// НАУШНИКИ
 const HeadphonesAccessory: React.FC<{ color: string; isSleeping?: boolean }> = ({ color, isSleeping }) => {
   const transformStr = `translate(0, ${ANCHORS.HEAD.y + 10})`;
+  const opacity = isSleeping ? 0.3 : 1;
   return (
-    <g transform={transformStr}>
+    <g transform={transformStr} opacity={opacity}>
       <path d="M-36 -12C-36 -42 36 -42 36 -12" fill="none" stroke={color} strokeWidth="5" />
       <g transform="translate(-36, -10)">
         <rect x="-8" y="-12" width="16" height="24" rx="6" fill={color} />
@@ -178,6 +199,7 @@ const HeadphonesAccessory: React.FC<{ color: string; isSleeping?: boolean }> = (
   );
 };
 
+// ОШЕЙНИК С КОЛОКОЛЬЧИКОМ
 const CollarAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform={`translate(${ANCHORS.NECK.x}, ${ANCHORS.NECK.y + 10})`}>
     <path d="M-56 -6C-30 10 30 10 56 -6" stroke={color} strokeWidth="8" strokeLinecap="round" />
@@ -186,6 +208,7 @@ const CollarAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// БАНТИК
 const BowTieAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform={`translate(${ANCHORS.NECK.x}, ${ANCHORS.NECK.y + 8})`}>
     <path d="M-30 -12L0 0L-30 12V-12Z" fill={color} />
@@ -194,6 +217,7 @@ const BowTieAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ШАРФ
 const ScarfAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform={`translate(${ANCHORS.NECK.x}, ${ANCHORS.NECK.y + 4})`}>
     <path d="M-64 -8C-30 8 30 8 64 -8C72 8 64 20 48 20C16 20 -16 20 -48 20C-64 20 -72 8 -64 -8Z" fill={color} />
@@ -204,23 +228,25 @@ const ScarfAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// БОТИНКИ / ТАПОЧКИ
 const BootsAccessory: React.FC<{ color: string }> = ({ color }) => (
-  <g transform={`translate(${ANCHORS.FEET.x}, ${ANCHORS.FEET.y - 5})`}>
-    <g transform="translate(-50, 0)">
-      <ellipse cx="0" cy="4" rx="28" ry="20" fill={color} />
-      <path d="M-12 -4C-12 -4 -8 -24 0 -24C8 -24 12 -4 12 -4" stroke={color} strokeWidth="10" strokeLinecap="round" />
-      <ellipse cx="0" cy="-20" rx="18" ry="6" fill="#ffffff" />
+  <g transform={`translate(${ANCHORS.FEET.x}, ${ANCHORS.FEET.y - 1})`}>
+    <g transform="translate(-25, 4)">
+      <ellipse cx="0" cy="4" rx="14" ry="9" fill={color} />
+      <path d="M-6 -3C-6 -3 -4 -14 0 -14C4 -14 6 -3 6 -3" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      <ellipse cx="0" cy="-11" rx="8" ry="2.5" fill="#ffffff" />
     </g>
-    <g transform="translate(50, 0)">
-      <ellipse cx="0" cy="4" rx="28" ry="20" fill={color} />
-      <path d="M-12 -4C-12 -4 -8 -24 0 -24C8 -24 12 -4 12 -4" stroke={color} strokeWidth="10" strokeLinecap="round" />
-      <ellipse cx="0" cy="-20" rx="18" ry="6" fill="#ffffff" />
+    <g transform="translate(25, 4)">
+      <ellipse cx="0" cy="4" rx="14" ry="9" fill={color} />
+      <path d="M-6 -3C-6 -3 -4 -14 0 -14C4 -14 6 -3 6 -3" stroke={color} strokeWidth="5" strokeLinecap="round" />
+      <ellipse cx="0" cy="-11" rx="8" ry="2.5" fill="#ffffff" />
     </g>
   </g>
 );
 
+// КРЫЛЬЯ
 const WingsAccessory: React.FC<{ color: string }> = ({ color }) => (
-  <g transform={`translate(${ANCHORS.BACK.x}, ${ANCHORS.BACK.y + 10}) scale(0.55)`} opacity="0.85">
+  <g transform="translate(0, 115)" opacity="0.85">
     <path d="M-56 -30C-130 -90 -170 -20 -110 20C-80 40 -60 20 -56 10Z" fill={color} stroke={color} strokeWidth="3" />
     <path d="M-56 10C-110 40 -130 70 -96 90C-70 104 -56 70 -56 50Z" fill={color} opacity="0.7" />
     <path d="M56 -30C130 -90 170 -20 110 20C80 40 60 20 56 10Z" fill={color} stroke={color} strokeWidth="3" />
@@ -230,6 +256,7 @@ const WingsAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
+// ЗАКОЛКА / ШПИЛЬКА
 const HairpinAccessory: React.FC<{ color: string }> = ({ color }) => (
   <g transform={`translate(${ANCHORS.HAIR.x}, ${ANCHORS.HAIR.y}) rotate(15)`}>
     <path d="M0 -10L3 -3L10 -3L5 1L7 8L0 4L-7 8L-5 1L-10 -3L-3 -3Z" fill={color} stroke="#ffffff" strokeWidth="1" />
@@ -237,8 +264,57 @@ const HairpinAccessory: React.FC<{ color: string }> = ({ color }) => (
   </g>
 );
 
-// ----- Главный рендерер -----
-export const RenderAccessory: React.FC<{ value: string; scale?: number; isSleeping?: boolean }> = ({ value, scale = 1, isSleeping = false }) => {
+// ==================== ГЛАВНЫЙ РЕНДЕРЕР ====================
+export interface AccessoryGeometry {
+  slot: string;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  layer: number;
+}
+
+export function getAccessoryConfig(value: string): AccessoryGeometry {
+  if (!value || value === 'none' || value === 'empty' || value === 'null') {
+    return { slot: 'none', scale: 1, offsetX: 0, offsetY: 0, layer: 0 };
+  }
+  const lower = value.toLowerCase();
+  const has = (str: string) => lower.includes(str);
+
+  if (has('crown') || has('корон')) {
+    return { slot: 'hat', scale: 1.0, offsetX: 0, offsetY: -10, layer: 5 };
+  }
+  if (has('halo') || has('нимб')) {
+    return { slot: 'hat', scale: 1.0, offsetX: 0, offsetY: -20, layer: 5 };
+  }
+  if (has('santa') || has('новогод') || has('санта') || has('detective') || has('шерлок') || has('детектив') || has('party') || has('празднич') || has('wizard') || has('волшеб') || has('top hat') || has('цилиндр') || has('fedora') || has('федора') || has('beanie') || has('шапк') || has('шапочк') || has('ushanka') || has('ушанк') || has('helmet') || has('шлем') || has('pirate') || has('пират') || has('cowboy') || has('ковбой') || has('hat') || has('шляп')) {
+    return { slot: 'hat', scale: 1.0, offsetX: 0, offsetY: 0, layer: 5 };
+  }
+  if (has('wings') || has('krylya') || has('крыль')) {
+    return { slot: 'wings', scale: 0.65, offsetX: 0, offsetY: 5, layer: -1 };
+  }
+  if (has('glasses') || has('ochki') || has('очк') || has('очки') || has('headphones') || has('naushniki') || has('наушник') || has('гарнитур')) {
+    return { slot: 'glasses', scale: 1.0, offsetX: 0, offsetY: 0, layer: 4 };
+  }
+  if (has('collar') || has('bell') || has('ошейник') || has('колокольч') || has('колокол')) {
+    return { slot: 'collar', scale: 1.0, offsetX: 0, offsetY: 10, layer: 3 };
+  }
+  if (has('bow') || has('ribbon') || has('bantik') || has('бант') || has('бабочк') || has('бантик')) {
+    return { slot: 'collar', scale: 1.0, offsetX: 0, offsetY: 8, layer: 3 };
+  }
+  if (has('scarf') || has('sharf') || has('шарф')) {
+    return { slot: 'scarf', scale: 1.0, offsetX: 0, offsetY: 4, layer: 3 };
+  }
+  if (has('boots') || has('slippers') || has('tapochki') || has('sapozhki') || has('тапочк') || has('сапожк') || has('туфл') || has('ботинк')) {
+    return { slot: 'boots', scale: 0.9, offsetX: 0, offsetY: -1, layer: 2 };
+  }
+  if (has('hairpin') || has('заколк') || has('star') || has('звезд') || has('шпильк') || has('заколка')) {
+    return { slot: 'hairpin', scale: 1.0, offsetX: 0, offsetY: 0, layer: 6 };
+  }
+
+  return { slot: 'accessory', scale: 1.0, offsetX: 0, offsetY: 0, layer: 1 };
+}
+
+export const RenderAccessory: React.FC<{ value: string; scale?: number; isSleeping?: boolean; skipTransform?: boolean }> = ({ value, scale = 1, isSleeping = false, skipTransform = false }) => {
   if (!value || value === 'none' || value === 'empty' || value === 'null' || value === 'undefined' || value.trim() === '') {
     return null;
   }
@@ -246,41 +322,84 @@ export const RenderAccessory: React.FC<{ value: string; scale?: number; isSleepi
   const color = getAccessoryColor(value);
   const lower = value.toLowerCase();
 
-  // Проверки на русские и английские ключевые слова
+  // Вспомогательные функции для поиска ключевых слов (поддержка русского и английского)
   const has = (str: string) => lower.includes(str);
 
-  const element = (() => {
-    // ----- Головные уборы -----
-    if (has('crown') || has('корон')) return <HatBase color={color} isSleeping={isSleeping}><CrownAccessory color={color} /></HatBase>;
-    if (has('halo') || has('нимб')) return <HatBase color={color} isSleeping={isSleeping}><HaloAccessory color={color} /></HatBase>;
-    if (has('santa') || has('новогод') || has('санта')) return <HatBase color={color} isSleeping={isSleeping}><SantaHatAccessory color={color} /></HatBase>;
-    if (has('detective') || has('шерлок') || has('детектив')) return <HatBase color={color} isSleeping={isSleeping}><DetectiveHatAccessory color={color} /></HatBase>;
-    if (has('party') || has('празднич')) return <HatBase color={color} isSleeping={isSleeping}><PartyHatAccessory color={color} /></HatBase>;
-    if (has('wizard') || has('волшеб')) return <HatBase color={color} isSleeping={isSleeping}><WizardHatAccessory color={color} /></HatBase>;
-    if (has('top hat') || has('цилиндр')) return <HatBase color={color} isSleeping={isSleeping}><TopHatAccessory color={color} /></HatBase>;
-    if (has('fedora') || has('федора')) return <HatBase color={color} isSleeping={isSleeping}><FedoraAccessory color={color} /></HatBase>;
-    if (has('beanie') || has('шапк') || has('шапочк')) return <HatBase color={color} isSleeping={isSleeping}><BeanieAccessory color={color} /></HatBase>;
-    if (has('ushanka') || has('ушанк')) return <HatBase color={color} isSleeping={isSleeping}><UshankaAccessory color={color} /></HatBase>;
-    if (has('helmet') || has('шлем')) return <HatBase color={color} isSleeping={isSleeping}><HelmetAccessory color={color} /></HatBase>;
-    if (has('pirate') || has('пират')) return <HatBase color={color} isSleeping={isSleeping}><PirateHatAccessory color={color} /></HatBase>;
-    if (has('cowboy') || has('ковбой')) return <HatBase color={color} isSleeping={isSleeping}><CowboyHatAccessory color={color} /></HatBase>;
-    if (has('hat') || has('шляп')) return <HatBase color={color} isSleeping={isSleeping}><BeanieAccessory color={color} /></HatBase>;
+  let element: React.ReactNode = null;
+  let anchor = { x: 0, y: 0 };
 
-    // ----- Остальные аксессуары -----
-    if (has('wings') || has('krylya') || has('крыль')) return <WingsAccessory color={color} />;
-    if (has('glasses') || has('ochki') || has('очк') || has('очки')) return <GlassesAccessory color={color} isSleeping={isSleeping} />;
-    if (has('headphones') || has('naushniki') || has('наушник') || has('гарнитур')) return <HeadphonesAccessory color={color} isSleeping={isSleeping} />;
-    if (has('collar') || has('bell') || has('ошейник') || doCollarDetect(lower)) return <CollarAccessory color={color} />;
-    if (has('bow') || has('ribbon') || has('bantik') || has('бант') || has('бабочк') || has('бантик')) return <BowTieAccessory color={color} />;
-    if (has('scarf') || has('sharf') || has('шарф')) return <ScarfAccessory color={color} />;
-    if (has('boots') || has('slippers') || has('tapochki') || has('sapozhki') || has('тапочк') || has('сапожк') || has('туфл') || BOOT_DETECT(lower)) return <BootsAccessory color={color} />;
-    if (has('hairpin') || has('заколк') || has('star') || has('звезд') || has('шпильк') || has('заколка')) return <HairpinAccessory color={color} />;
+  // Определяем, какой аксессуар рендерить и его абсолютный якорь
+  if (has('crown') || has('корон')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><CrownAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('halo') || has('нимб')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><HaloAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('santa') || has('новогод') || has('санта')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><SantaHatAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('detective') || has('шерлок') || has('детектив')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><DetectiveHatAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('party') || has('празднич')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><PartyHatAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('wizard') || has('волшеб')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><WizardHatAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('top hat') || has('цилиндр')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><TopHatAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('fedora') || has('федора')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><FedoraAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('beanie') || has('шапк') || has('шапочк')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><BeanieAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('ushanka') || has('ушанк')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><UshankaAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('helmet') || has('шлем')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><HelmetAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('pirate') || has('пират')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><PirateHatAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('cowboy') || has('ковбой')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><CowboyHatAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  } else if (has('hat') || has('шляп')) {
+    element = <HatBase color={color} isSleeping={isSleeping}><BeanieAccessory color={color} /></HatBase>;
+    anchor = ANCHORS.HEAD;
+  }
 
-    return null;
-  })();
+  else if (has('wings') || has('krylya') || has('крыль')) {
+    element = <WingsAccessory color={color} />;
+    anchor = ANCHORS.BACK;
+  } else if (has('glasses') || has('ochki') || has('очк') || has('очки')) {
+    element = <GlassesAccessory color={color} isSleeping={isSleeping} />;
+    anchor = ANCHORS.EYES;
+  } else if (has('headphones') || has('naushniki') || has('наушник') || has('гарнитур')) {
+    element = <HeadphonesAccessory color={color} isSleeping={isSleeping} />;
+    anchor = ANCHORS.EYES;
+  } else if (has('collar') || has('bell') || has('ошейник') || has('колокольч') || has('колокол')) {
+    element = <CollarAccessory color={color} />;
+    anchor = ANCHORS.NECK;
+  } else if (has('bow') || has('ribbon') || has('bantik') || has('бант') || has('бабочк') || has('бантик')) {
+    element = <BowTieAccessory color={color} />;
+    anchor = ANCHORS.NECK;
+  } else if (has('scarf') || has('sharf') || has('шарф')) {
+    element = <ScarfAccessory color={color} />;
+    anchor = ANCHORS.NECK;
+  } else if (has('boots') || has('slippers') || has('tapochki') || has('sapozhki') || has('тапочк') || has('сапожк') || has('туфл') || has('ботинк')) {
+    element = <BootsAccessory color={color} />;
+    anchor = ANCHORS.FEET;
+  } else if (has('hairpin') || has('заколк') || has('star') || has('звезд') || has('шпильк') || has('заколка')) {
+    element = <HairpinAccessory color={color} />;
+    anchor = ANCHORS.HAIR;
+  }
 
   if (!element) {
-    // Неизвестный аксессуар – логируем только один раз
     if (!loggedUnknown.has(value)) {
       loggedUnknown.add(value);
       console.warn(`[RenderAccessory] Неизвестный аксессуар: "${value}"`);
@@ -288,17 +407,14 @@ export const RenderAccessory: React.FC<{ value: string; scale?: number; isSleepi
     return null;
   }
 
+  if (skipTransform) {
+    return <>{element}</>;
+  }
+
+  // Применяем точное масштабирование относительно абсолютного якоря
   return (
-    <g transform={`scale(${scale})`}>
+    <g transform={`translate(${anchor.x}, ${anchor.y}) scale(${scale}) translate(${-anchor.x}, ${-anchor.y})`}>
       {element}
     </g>
   );
 };
-
-function doCollarDetect(lower: string): boolean {
-  return lower.includes('колокольч') || lower.includes('колокол') || lower.includes('bell');
-}
-
-function BOOT_DETECT(lower: string): boolean {
-  return lower.includes('boots') || lower.includes('slippers') || lower.includes('tapochki') || lower.includes('sapozhki') || lower.includes('тапочк') || lower.includes('сапожк') || lower.includes('туфл') || lower.includes('ботинк');
-}

@@ -1,3 +1,4 @@
+// src/utils/windowManager.ts
 export interface WindowPosition {
   width: string | number;
   height: string | number;
@@ -25,14 +26,15 @@ export function getWindowLayout(
   const isMobile = screenWidth < 768;
 
   if (isMobile) {
-    // На телефонах окно занимает ВСЁ доступное пространство под меню, перекрывая док для удобства
-    const topOffset = 36;  // высота меню
+    // На телефонах окно на весь экран, только с отступом сверху под меню (36px)
+    const topOffset = 36;
     return {
       width: '100%',
       height: screenHeight - topOffset,
       top: topOffset,
       bottom: 0,
       left: 0,
+      transform: 'none',
     };
   }
 
@@ -47,6 +49,7 @@ export function getWindowLayout(
     return { width, height, top, left };
   }
 
+  // Десктоп
   const width = Math.min(840, screenWidth - 120);
   const height = Math.min(580, screenHeight - 180);
   const left = Math.max(0, (screenWidth - Number(width)) / 2 + offset.x);

@@ -13,6 +13,10 @@ interface SettingsWindowProps {
   onClaimReviewReward: () => void;
   onClose: () => void;
   onMinimize: () => void;
+  syncing?: boolean;
+  onSync?: () => void;
+  isOfflineMode?: boolean;
+  setIsOfflineMode?: (val: boolean) => void;
 }
 
 export const SettingsWindow: React.FC<SettingsWindowProps> = ({
@@ -30,7 +34,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
   const [pastedStatus, setPastedStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Эффект для применения темы к корневому элементу
+  // Применение темы (оставляем для авто-темы, но UI блока нет)
   useEffect(() => {
     if (!profile) return;
     const root = document.documentElement;
@@ -42,7 +46,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
       root.classList.add('light');
       root.classList.remove('dark');
     } else {
-      // auto: смотрим системную тему
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (isDark) {
         root.classList.add('dark');
@@ -53,22 +56,6 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
       }
     }
   }, [profile]);
-
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const diffX = e.changedTouches[0].clientX - touchStartX.current;
-    const diffY = e.changedTouches[0].clientY - touchStartY.current;
-    if (diffY > 100 && Math.abs(diffX) < 60) {
-      onMinimize();
-    }
-  };
 
   if (!profile) return null;
 
@@ -128,42 +115,42 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
       id="settings"
       onClose={onClose}
       onMinimize={onMinimize}
-      title="Системные настройки"
-      subtitle="Настройки"
+      title="Настройки"
+      subtitle="Система"
     >
       <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-900/40 space-y-4">
-        {/* Push-уведомления */}
+        {/* ===== PUSH-УВЕДОМЛЕНИЯ ===== */}
         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
           <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles size={14} className="text-amber-400" />
-            Важные PUSH-Уведомления (iOS/PWA)
+            Push-уведомления
           </h3>
           <p className="text-[10px] text-slate-400 leading-normal text-left">
-            Получайте системные напоминания на телефон или рабочий стол, когда ваш пушистый питомец проголодается или захочет поиграть!
+            Получайте напоминания, когда питомец проголодается или захочет играть.
           </p>
           <button
             onClick={async () => {
               if (!('Notification' in window)) {
-                alert('Ваш браузер или устройство не поддерживает PUSH-уведомления.');
+                alert('Ваш браузер не поддерживает уведомления.');
                 return;
               }
               const perm = await Notification.requestPermission();
               if (perm === 'granted') {
-                new Notification('MacCat Care 🐾', {
-                  body: 'Уведомления включены! Теперь мы сообщим вам, когда котику потребуется забота.',
+                new Notification('MacCat 🐾', {
+                  body: 'Уведомления включены!',
                   tag: 'maccat_test',
                 });
               } else {
-                alert('Разрешение на уведомления отклонено. Пожалуйста, включите их в настройках браузера/устройства.');
+                alert('Разрешение отклонено.');
               }
             }}
             className="w-full py-2 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white transition-all active:scale-95 cursor-pointer shadow-md flex items-center justify-center gap-1.5"
           >
-            🔔 Разрешить и протестировать Push-уведомления
+            🔔 Разрешить уведомления
           </button>
         </div>
 
-        {/* Бонус за отзыв (скрывается, если получен) */}
+        {/* ===== БОНУС ЗА ОТЗЫВ ===== */}
         {!profile.claimedReviewReward && (
           <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-3 text-left">
@@ -171,9 +158,9 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
                 <Star size={20} className="animate-spin-slow" />
               </div>
               <div>
-                <h4 className="text-xs font-black text-white flex items-center gap-1.5">Бонус за отзыв об игре! ⭐️</h4>
+                <h4 className="text-xs font-black text-white flex items-center gap-1.5">Бонус за отзыв! ⭐️</h4>
                 <p className="text-[10px] text-slate-300 leading-normal max-w-sm">
-                  Оставьте отзыв о нашей игре! Вы получите <span className="font-extrabold text-amber-400">+100 лапок 🐾</span>.
+                  Оставьте отзыв – получите <span className="font-extrabold text-amber-400">+100 лапок 🐾</span>.
                 </p>
               </div>
             </div>
@@ -186,15 +173,15 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
           </div>
         )}
 
-        {/* Временный блок переноса прогресса на новый сайт */}
+        {/* ===== ПЕРЕЕЗД НА НОВЫЙ САЙТ ===== */}
         <div className="bg-gradient-to-r from-sky-500/10 to-indigo-500/10 border border-sky-500/30 rounded-2xl p-4 space-y-3 relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-24 h-24 bg-sky-500/10 rounded-full blur-xl pointer-events-none" />
           <div className="space-y-1">
             <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-              🚚 ПЕРЕЕЗД НА НОВЫЙ САЙТ (ПЕРЕНЕСТИ ПРОГРЕСС)
+              🚚 ПЕРЕЕЗД НА НОВЫЙ САЙТ
             </h4>
             <p className="text-[10px] text-slate-300 leading-relaxed text-left">
-              Мы переносим симуляцию на новый постоянный адрес! Нажмите на кнопку ниже: ваш игровой прогресс на 100% скопируется в буфер обмена, и вы автоматически перейдете на новый сайт, где сможете мгновенно продолжить игру.
+              Переносим игру на новый адрес! Нажмите кнопку ниже: прогресс скопируется в буфер, и вы перейдёте на новый сайт.
             </p>
           </div>
           <button
@@ -203,45 +190,45 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
                 const dataStr = JSON.stringify(profile);
                 const b64 = btoa(unescape(encodeURIComponent(dataStr)));
                 navigator.clipboard.writeText(b64);
-                alert("✅ Код сохранения успешно скопирован в буфер обмена (100% экспорт)!\n\nСейчас вы будете перенаправлены на новый адрес: https://cat-orpin-nine.vercel.app/\n\nТам нажмите кнопку 'Уже играли? Импортировать прогресс' и просто вставьте ваш код!");
+                alert("✅ Код сохранения скопирован!\n\nПереход на новый сайт...");
                 window.location.href = "https://cat-orpin-nine.vercel.app/";
               } catch (e) {
                 console.error(e);
-                alert("Ошибка копирования прогресса.");
+                alert("Ошибка копирования.");
               }
             }}
             className="w-full py-2.5 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all active:scale-95 cursor-pointer bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2"
           >
-            ✈️ Скопировать прогресс и перейти на новый сайт
+            ✈️ Скопировать прогресс и перейти
           </button>
         </div>
 
-        {/* Перенос прогресса и резервные копии */}
+        {/* ===== РЕЗЕРВНОЕ КОПИРОВАНИЕ ===== */}
         <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-4">
           <div className="space-y-0.5">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles size={14} className="text-sky-400" />
-              Резервное копирование и перенос
+              Резервное копирование
             </h3>
             <p className="text-[10px] text-slate-400 leading-normal">
-              Вы можете сохранить прогресс вручную или перенести его на другое устройство с помощью текстовых кодов.
+              Сохраните прогресс или перенесите на другое устройство.
             </p>
           </div>
 
           {/* Экспорт */}
           <div className="space-y-1.5">
-            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Экспорт прогресса (Скопировать код)</label>
-            <div className="flex gap-2">
+            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Экспорт</label>
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 readOnly
                 value={exportCode}
-                placeholder="Нажмите 'Создать код', чтобы экспортировать"
-                className="flex-1 px-3 py-1.5 text-xs font-mono rounded-xl bg-black/35 border border-white/10 text-slate-300 focus:outline-none"
+                placeholder="Нажмите 'Создать'"
+                className="flex-1 px-3 py-2 text-xs font-mono rounded-xl bg-black/35 border border-white/10 text-slate-300 focus:outline-none min-h-[40px]"
               />
               <button
                 onClick={handleExportSave}
-                className="px-4 py-1.5 text-xs font-bold rounded-xl bg-sky-500 hover:bg-sky-600 text-white transition-all cursor-pointer whitespace-nowrap"
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-sky-500 hover:bg-sky-600 text-white transition-all cursor-pointer whitespace-nowrap w-full sm:w-auto min-h-[40px]"
               >
                 {copied ? 'Скопировано! ✅' : 'Создать и скопировать'}
               </button>
@@ -250,17 +237,17 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
 
           {/* Импорт */}
           <div className="space-y-1.5 pt-2 border-t border-white/5">
-            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Импорт прогресса (Вставить код)</label>
+            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Импорт</label>
             <div className="flex flex-col gap-2">
               <textarea
                 value={importCodeInput}
                 onChange={(e) => setImportCodeInput(e.target.value)}
-                placeholder="Вставьте скопированный ранее код сохранения сюда..."
+                placeholder="Вставьте код сохранения..."
                 className="w-full h-16 px-3 py-2 text-xs font-mono rounded-xl bg-black/35 border border-white/10 text-slate-300 focus:outline-none focus:border-sky-500 transition-all resize-none"
               />
               <button
                 onClick={handleImportSave}
-                className={`w-full py-2 text-xs font-bold rounded-xl text-white transition-all cursor-pointer ${
+                className={`w-full py-2 text-xs font-bold rounded-xl text-white transition-all cursor-pointer min-h-[40px] ${
                   pastedStatus === 'success'
                     ? 'bg-emerald-500'
                     : pastedStatus === 'error'
@@ -268,25 +255,34 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
                     : 'bg-emerald-600 hover:bg-emerald-700'
                 }`}
               >
-                {pastedStatus === 'success' ? 'Прогресс успешно импортирован! Перезагрузка...' : pastedStatus === 'error' ? 'Ошибка! Неверный код сохранения' : 'Импортировать и загрузить'}
+                {pastedStatus === 'success' ? '✅ Импортировано!' : pastedStatus === 'error' ? '❌ Ошибка!' : 'Импортировать и загрузить'}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-t border-white/5 pt-4 text-[10px]">
-          <div className="flex items-center gap-1.5 text-slate-400 text-left">
-            <Sparkles size={12} className="text-amber-400" />
-            <span>Главный дизайнер и разработчик: <strong className="text-slate-300">Maksym Skorina</strong></span>
+        {/* ===== КРАСИВАЯ ПЛАШКА СБРОСА ДАННЫХ ===== */}
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="bg-gradient-to-r from-rose-500/10 to-red-500/10 border border-rose-500/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-10 h-10 rounded-full bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                <Trash2 size={18} className="animate-pulse" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-white">Сброс всех данных</h4>
+                <p className="text-[10px] text-slate-400 leading-normal">
+                  Удалить всех котиков, лапки, скины и историю. <span className="text-rose-400 font-bold">Необратимо!</span>
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleReset}
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-lg shadow-rose-500/20 flex items-center gap-2 shrink-0"
+            >
+              <Trash2 size={14} />
+              Сбросить всё
+            </button>
           </div>
-          <button
-            onClick={handleReset}
-            className="px-3 py-1.5 rounded-xl border border-rose-500/30 text-rose-400 bg-rose-500/5 hover:bg-rose-500/15 transition-all font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 self-end sm:self-center shrink-0"
-          >
-            <Trash2 size={12} />
-            <span>Сбросить данные</span>
-          </button>
         </div>
       </div>
 
@@ -305,23 +301,23 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({
               exit={{ scale: 0.9, y: 20 }}
               className="bg-neutral-900/90 border border-white/10 rounded-2xl max-w-xs w-full p-5 text-center shadow-2xl relative"
             >
-              <div className="w-12 h-12 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-3.5">
-                <Trash2 size={22} className="animate-pulse" />
+              <div className="w-14 h-14 bg-rose-500/15 text-rose-500 border border-rose-500/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={26} className="animate-pulse" />
               </div>
-              <h4 className="text-xs font-black text-white uppercase tracking-wider mb-1">Стереть весь прогресс?</h4>
-              <p className="text-[10px] text-slate-300 leading-relaxed mb-4">
-                Это действие полностью сотрет всех ваших котиков, лапки, купленные скины и историю активности. Это невозможно отменить.
+              <h4 className="text-base font-black text-white uppercase tracking-wider mb-2">Удалить всё?</h4>
+              <p className="text-[11px] text-slate-300 leading-relaxed mb-5">
+                Все ваши котики, лапки, скины и достижения будут стёрты без возможности восстановления. Вы уверены?
               </p>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <button
                   onClick={executeReset}
-                  className="w-full py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-[11px] uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-bold text-[11px] uppercase tracking-wider transition-all active:scale-95 cursor-pointer shadow-lg shadow-rose-500/20"
                 >
-                  Стереть всё навсегда
+                  Да, удалить всё
                 </button>
                 <button
                   onClick={() => setShowResetConfirm(false)}
-                  className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold text-[11px] uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold text-[11px] uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
                 >
                   Отмена
                 </button>

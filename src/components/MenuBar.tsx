@@ -7,8 +7,6 @@ import { RefreshCw, Flame } from 'lucide-react';
 interface MenuBarProps {
   profile: PlayerProfile | null;
   isOnline: boolean;
-  syncing: boolean;
-  onSync: () => void;
   onOpenSettings: () => void;
   onOpenAbout: () => void;
   onAppleClick: () => void;
@@ -20,8 +18,6 @@ interface MenuBarProps {
 export const MenuBar: React.FC<MenuBarProps> = ({
   profile,
   isOnline,
-  syncing,
-  onSync,
   onOpenSettings,
   onOpenAbout,
   onAppleClick,
@@ -62,18 +58,6 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         >
           
         </span>
-        
-        <button
-          onClick={onSync}
-          disabled={syncing}
-          className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-white/10 dark:bg-black/10 hover:bg-white/20 dark:hover:bg-black/20 transition-all active:scale-95 disabled:opacity-50"
-          title={syncing ? 'Синхронизация...' : 'Синхронизировать прогресс'}
-        >
-          <RefreshCw size={12} className={`${syncing ? 'animate-spin' : ''} text-slate-600 dark:text-slate-300`} />
-          <span className="text-[8px] font-mono font-bold text-slate-600 dark:text-slate-300 hidden sm:inline">
-            {syncing ? 'Синхр...' : 'Синхр.'}
-          </span>
-        </button>
 
         <button
           onClick={onStreakClick}

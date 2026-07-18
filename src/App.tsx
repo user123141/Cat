@@ -13,6 +13,7 @@ import { AnalyticsWindow } from './components/AnalyticsWindow';
 import { SettingsWindow } from './components/SettingsWindow';
 import { AntistressWindow } from './components/AntistressWindow';
 import { MessengerWindow } from './components/MessengerWindow';
+import { WardrobeWindow } from './components/WardrobeWindow';
 import { CarePackPopover } from './components/CarePackPopover';
 import { Onboarding } from './components/Onboarding';
 import { Dock } from './components/Dock';
@@ -29,15 +30,38 @@ import { PlayerProfile, Skin } from './types';
 const ADMIN_PASSWORD = '1111';
 
 export default function App() {
+  const gameState = useGameState();
+
   const {
-    profile,
-    notifications,
+    profile: currentProfile,
+    notifications: gameNotifications,
     isOnline,
-    syncing: syncingState,
-    analytics,
-    allSkins,
     isOfflineMode,
     setIsOfflineMode,
+    analytics,
+    allSkins,
+    removeNotification: gameRemoveNotification,
+    createProfile,
+    interactWithCat,
+    petCatClick,
+    burstPopIt,
+    clickKeyboard,
+    claimQuestReward,
+    purchaseSkinOrAccessory,
+    applySkinOrAccessory,
+    adoptNewCat,
+    selectActiveCat,
+    addPaws,
+    claimReviewReward,
+    claimStreakMilestone,
+    updateWallpaper,
+    redeemPromoCode,
+    updateNickname,
+    updateThemePref,
+    addDiaryEntry,
+    updateProfile,
+
+    syncing,
     syncLog,
     lastSyncedTime,
     showConflictModal,
@@ -45,28 +69,23 @@ export default function App() {
     conflictCloudData,
     conflictLocalData,
     resolveConflict,
-    redeemPromoCode,
-    createProfile,
-    interactWithCat,
-    claimQuestReward,
-    purchaseSkinOrAccessory,
-    applySkinOrAccessory,
-    adoptNewCat,
-    selectActiveCat,
-    triggerCloudSync: originalTriggerCloudSync,
-    updateNickname,
-    updateThemePref,
-    removeNotification,
-    addPaws,
-    claimReviewReward,
-    claimStreakMilestone,
-    updateWallpaper,
-    petCatClick,
-    burstPopIt,
-    clickKeyboard,
-    addDiaryEntry,
-    updateProfile,
-  } = useGameState();
+    triggerCloudSync,
+
+    isAdminMode,
+    setIsAdminMode,
+    usersList,
+    fetchUsersList,
+    handleBlockUser,
+    handleUnblockUser,
+    handleDeleteUser,
+    handleMakeAdmin,
+    handleChangeBalance,
+    handleSaveNickname,
+    handleBroadcastAnnouncement,
+    originalProfile,
+    impersonateUser,
+    stopImpersonating
+  } = gameState;
 
   const {
     openWindows,
@@ -82,24 +101,19 @@ export default function App() {
   const [showScreensaver, setShowScreensaver] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [weatherOverride, setWeatherOverride] = useState<'rain' | 'snow' | 'morning' | 'night' | 'none' | null>(null);
-
-  const [isAdminMode, setIsAdminMode] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
-  const [clickCount, setClickCount] = useState(0);
-  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
-
   const [careCategory, setCareCategory] = useState<'food' | 'toy' | 'soap' | null>(null);
   const [questsInitialTab, setQuestsInitialTab] = useState<'quests' | 'calendar'>('quests');
+  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ===== ФУНКЦИИ ДЛЯ ОКОН =====
   const handleOpenWindow = useCallback((id: WindowId) => {
     if (id === 'calendar') {
       setQuestsInitialTab('calendar');
       openWindow('quests');
     } else {
-      if (id === 'quests') {
-        setQuestsInitialTab('quests');
-      }
+      if (id === 'quests') setQuestsInitialTab('quests');
       openWindow(id);
     }
   }, [openWindow]);
@@ -109,126 +123,47 @@ export default function App() {
       setQuestsInitialTab('calendar');
       toggleWindow('quests');
     } else {
-      if (id === 'quests') {
-        setQuestsInitialTab('quests');
-      }
+      if (id === 'quests') setQuestsInitialTab('quests');
       toggleWindow(id);
     }
   }, [toggleWindow]);
 
   const handleInteractionClick = useCallback((action: string) => {
-    if (action === 'feed') {
-      setCareCategory('food');
-    } else if (action === 'play') {
-      setCareCategory('toy');
-    } else if (action === 'clean') {
-      setCareCategory('soap');
-    } else {
-      interactWithCat(action);
-    }
+    if (action === 'feed') setCareCategory('food');
+    else if (action === 'play') setCareCategory('toy');
+    else if (action === 'clean') setCareCategory('soap');
+    else interactWithCat(action);
   }, [interactWithCat]);
 
-  const [usersList, setUsersList] = useState<any[]>([]);
-  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ===== ТЕМА =====
   useEffect(() => {
-    // Запрос разрешения на уведомления при первом запуске
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(perm => {
-        if (perm === 'granted') {
-          console.log('🔔 Уведомления разрешены');
-        }
-      });
-    }
-  }, []);
-
-  const fetchUsersList = useCallback(async () => {
-    try {
-      if (!supabase) return;
-      const { data, error } = await supabase
-        .from('player_profiles')
-        .select('*');
-      if (error) throw error;
-      setUsersList((data || []).map(row => ({ 
-        id: row.id, 
-        ...row.profile_data, 
-        nickname: row.profile_data?.nickname || row.id,
-        created_at: row.created_at
-      })));
-    } catch (e) {
-      console.error('Ошибка загрузки пользователей:', e);
-    }
-  }, []);
-
-  const syncStateRef = useRef({
-    profile,
-    isOnline,
-    isOfflineMode,
-    showConflictModal,
-    originalTriggerCloudSync
-  });
-
-  useEffect(() => {
-    syncStateRef.current = {
-      profile,
-      isOnline,
-      isOfflineMode,
-      showConflictModal,
-      originalTriggerCloudSync
-    };
-  }, [profile, isOnline, isOfflineMode, showConflictModal, originalTriggerCloudSync]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const state = syncStateRef.current;
-      if (state.profile && state.isOnline && !state.isOfflineMode && !state.showConflictModal) {
-        state.originalTriggerCloudSync();
-      }
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (!profile) return;
+    if (!currentProfile) return;
     const updateTheme = () => {
-      if (profile.theme === 'auto') {
-        const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        setResolvedTheme(isSystemDark ? 'dark' : 'light');
+      if (currentProfile.theme === 'auto') {
+        setResolvedTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       } else {
-        setResolvedTheme(profile.theme);
+        setResolvedTheme(currentProfile.theme);
       }
     };
     updateTheme();
-    if (profile.theme === 'auto') {
+    if (currentProfile.theme === 'auto') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const listener = (e: MediaQueryListEvent) => {
-        setResolvedTheme(e.matches ? 'dark' : 'light');
-      };
+      const listener = (e: MediaQueryListEvent) => setResolvedTheme(e.matches ? 'dark' : 'light');
       mediaQuery.addEventListener('change', listener);
       return () => mediaQuery.removeEventListener('change', listener);
     }
-  }, [profile?.theme]);
+  }, [currentProfile?.theme]);
 
   useEffect(() => {
-    fetchUsersList();
-  }, [fetchUsersList]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (resolvedTheme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
   }, [resolvedTheme]);
 
   useEffect(() => {
-    if (profile) {
-      setSoundsMuted(!profile.soundEnabled);
-    }
-  }, [profile?.soundEnabled]);
+    if (currentProfile) setSoundsMuted(!currentProfile.soundEnabled);
+  }, [currentProfile?.soundEnabled]);
 
+  // ===== СКРИНСЕЙВЕР =====
   useEffect(() => {
     let inactivityTimer: NodeJS.Timeout;
     const resetTimer = () => {
@@ -245,10 +180,8 @@ export default function App() {
     };
   }, [showScreensaver]);
 
-  const handleAdminLogin = () => {
-    setShowAdminPrompt(true);
-  };
-
+  // ===== АДМИНКА =====
+  const handleAdminLogin = () => setShowAdminPrompt(true);
   const handleAdminPassword = (password: string) => {
     if (password === ADMIN_PASSWORD) {
       setIsAdminMode(true);
@@ -260,12 +193,11 @@ export default function App() {
       alert('Неверный пароль');
     }
   };
-
   const handleAdminLogout = () => {
     setIsAdminMode(false);
-    setUsersList([]);
   };
 
+  // ===== КОНТЕКСТНОЕ МЕНЮ =====
   const handleContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const isInsideWindow = target.closest('.mac-window-frame') || target.closest('.glass-panel-dark') || target.closest('button') || target.closest('input');
@@ -293,72 +225,48 @@ export default function App() {
     }
   };
 
-  const activeCat = profile?.cats?.find(c => c.id === profile.activeCatId);
+  const activeCat = currentProfile?.cats?.find(c => c.id === currentProfile.activeCatId);
 
   const handleManualSync = useCallback(async () => {
-    GameLogger.log('info', 'Ручная синхронизация запущена из меню настроек App.tsx');
-    await originalTriggerCloudSync();
-    if (isAdminMode) {
-      await fetchUsersList();
-    }
-  }, [originalTriggerCloudSync, isAdminMode, fetchUsersList]);
+    GameLogger.log('info', 'Ручная синхронизация');
+    await triggerCloudSync();
+    if (isAdminMode) await fetchUsersList();
+  }, [triggerCloudSync, isAdminMode, fetchUsersList]);
 
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (profile) {
-        localStorage.setItem('maccat_profile', JSON.stringify(profile));
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [profile]);
-
-  if (!profile) {
+  // ===== ЕСЛИ ПРОФИЛЬ НЕ ЗАГРУЖЕН =====
+  if (!currentProfile) {
     return <Onboarding onCreateProfile={createProfile} />;
   }
 
-  // Check if user is blocked and if ban has expired
+  // ===== ПРОВЕРКА БАНА =====
   const isBanActive = (() => {
-    if (!profile?.blocked) return false;
-    if (profile.blockedUntil === -1) return true; // permanent
-    if (profile.blockedUntil && Date.now() < profile.blockedUntil) {
-      return true; // ban is still active
-    }
-    return false; // ban expired
+    if (!currentProfile?.blocked) return false;
+    if (currentProfile.blockedUntil === -1) return true;
+    if (currentProfile.blockedUntil && Date.now() < currentProfile.blockedUntil) return true;
+    return false;
   })();
 
-  if (profile && isBanActive) {
-    const banDateStr = profile.blockedUntil === -1 ? 'Перманентно ♾️' : new Date(profile.blockedUntil).toLocaleString('ru-RU');
+  if (isBanActive) {
+    const banDateStr = currentProfile.blockedUntil === -1 ? 'Перманентно ♾️' : new Date(currentProfile.blockedUntil).toLocaleString('ru-RU');
     return (
       <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center select-none z-[9999] font-sans">
         <div className="max-w-md w-full bg-slate-900 border border-red-500/30 p-8 rounded-3xl shadow-2xl space-y-6">
-          <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-4xl animate-pulse">
-            🚫
-          </div>
+          <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-4xl animate-pulse">🚫</div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-extrabold text-white tracking-tight">Ваш аккаунт заблокирован</h1>
-            <p className="text-sm text-slate-400">Администрация Care OS ограничила доступ к вашей учетной записи.</p>
+            <h1 className="text-2xl font-extrabold text-white tracking-tight">Аккаунт заблокирован</h1>
+            <p className="text-sm text-slate-400">Доступ ограничен администрацией.</p>
           </div>
-          
           <div className="bg-black/30 border border-white/5 rounded-2xl p-4 text-left space-y-2.5">
-            <div>
-              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Причина блокировки</span>
-              <p className="text-sm text-slate-200 font-medium">{profile.blockedReason || 'Нарушение правил игры или использование стороннего ПО'}</p>
-            </div>
-            <div className="border-t border-white/5 pt-2">
-              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Блокировка действует до</span>
-              <p className="text-sm text-rose-400 font-bold">{banDateStr}</p>
-            </div>
+            <div><span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Причина</span><p className="text-sm text-slate-200 font-medium">{currentProfile.blockedReason || 'Нарушение правил'}</p></div>
+            <div className="border-t border-white/5 pt-2"><span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">До</span><p className="text-sm text-rose-400 font-bold">{banDateStr}</p></div>
           </div>
-          
-          <p className="text-xs text-slate-500 leading-normal">
-            Если вы считаете, что блокировка была выдана ошибочно, пожалуйста, обратитесь к администратору игры.
-          </p>
+          <p className="text-xs text-slate-500 leading-normal">Обратитесь к администратору, если считаете блокировку ошибочной.</p>
         </div>
       </div>
     );
   }
 
+  // ===== ОСНОВНОЙ РЕНДЕР =====
   return (
     <div
       onContextMenu={handleContextMenu}
@@ -369,7 +277,14 @@ export default function App() {
         resolvedTheme === 'dark' ? 'bg-slate-950' : 'bg-slate-100'
       }`}
     >
-      <DesktopBackground wallpaperId={profile.currentWallpaper} weatherOverride={weatherOverride} />
+      {originalProfile && (
+        <div className="fixed top-0 left-0 right-0 h-10 bg-amber-500 text-slate-950 flex items-center justify-between px-4 z-[9999] font-black text-xs shadow-lg">
+          <span className="flex items-center gap-1.5">🚨 Режим имперсонации: Просмотр профиля {currentProfile.nickname} (ID: {currentProfile.id})</span>
+          <button onClick={stopImpersonating} className="bg-slate-950 text-white hover:bg-slate-900 px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition">Вернуться в свой аккаунт</button>
+        </div>
+      )}
+
+      <DesktopBackground wallpaperId={currentProfile.currentWallpaper} weatherOverride={weatherOverride} />
 
       <AnimatePresence>
         {contextMenu && (
@@ -380,23 +295,21 @@ export default function App() {
             onUpdateWallpaper={updateWallpaper}
             onUpdateWeather={(w) => setWeatherOverride(w)}
             activeWeather={weatherOverride}
-            activeWallpaper={profile.currentWallpaper}
+            activeWallpaper={currentProfile.currentWallpaper}
             onOpenApp={(id) => handleOpenWindow(id as WindowId)}
           />
         )}
       </AnimatePresence>
 
       <MenuBar
-        profile={profile}
+        profile={currentProfile}
         isOnline={isOnline}
-        syncing={syncingState}
-        onSync={handleManualSync}
         onOpenSettings={() => handleOpenWindow('settings')}
         onOpenAbout={() => handleOpenWindow('analytics')}
         onAppleClick={() => {
           triggerHaptic();
           if (isAdminMode) {
-            // Already open
+            // уже открыто
           } else {
             handleAdminLogin();
           }
@@ -407,122 +320,136 @@ export default function App() {
         }}
         isAdminMode={isAdminMode}
       >
-        <DynamicIsland notifications={notifications} onDismiss={removeNotification} />
+        <DynamicIsland notifications={gameNotifications} onDismiss={gameRemoveNotification} />
       </MenuBar>
 
       <SwiftUIWidgets
-        profile={profile}
+        profile={currentProfile}
         activeCat={activeCat}
         allSkins={allSkins}
         onInteract={handleInteractionClick}
         onOpenWindow={(id) => handleOpenWindow(id as WindowId)}
       />
 
-      <div className="absolute top-0 left-0 w-full h-full pt-9 pb-20 z-20 pointer-events-none">
+      {/* ===== КОНТЕЙНЕР ОКОН ===== */}
+      <div className="absolute top-0 left-0 w-full h-full pb-20 z-20 pointer-events-none">
         <div className="w-full h-full relative pointer-events-none">
           <AnimatePresence>
+            {/* КОМНАТА КОТИКОВ */}
             {openWindows.includes('cats') && (
-              <div key="cats" className={minimizedWindows.includes('cats') ? 'hidden' : 'contents'}>
-                <CatWindow
-                  profile={profile}
-                  activeCat={activeCat}
-                  allSkins={allSkins}
-                  onInteract={handleInteractionClick}
-                  onSelectCat={selectActiveCat}
-                  onClose={() => closeWindow('cats')}
-                  onMinimize={() => minimizeWindow('cats')}
-                  onAdoptClick={() => handleOpenWindow('cats')}
-                  onPetClick={petCatClick}
-                />
-              </div>
+              <CatWindow
+                key="cats"
+                profile={currentProfile}
+                activeCat={activeCat}
+                allSkins={allSkins}
+                onInteract={handleInteractionClick}
+                onSelectCat={selectActiveCat}
+                onClose={() => closeWindow('cats')}
+                onMinimize={() => minimizeWindow('cats')}
+                onAdoptClick={() => handleOpenWindow('cats')}
+                onPetClick={petCatClick}
+              />
             )}
 
+            {/* МАГАЗИН */}
             {openWindows.includes('shop') && (
-              <div key="shop" className={minimizedWindows.includes('shop') ? 'hidden' : 'contents'}>
-                <ShopWindow
-                  profile={profile}
-                  activeCat={activeCat}
-                  allSkins={allSkins}
-                  onPurchase={purchaseSkinOrAccessory}
-                  onApply={applySkinOrAccessory}
-                  onDonatePaws={(amount) => addPaws(amount, true)}
-                  onClose={() => closeWindow('shop')}
-                  onMinimize={() => minimizeWindow('shop')}
-                  onRedeemPromo={redeemPromoCode}
-                />
-              </div>
+              <ShopWindow
+                key="shop"
+                profile={currentProfile}
+                activeCat={activeCat}
+                allSkins={allSkins}
+                onPurchase={purchaseSkinOrAccessory}
+                onApply={applySkinOrAccessory}
+                onDonatePaws={(amount) => addPaws(amount, true)}
+                onClose={() => closeWindow('shop')}
+                onMinimize={() => minimizeWindow('shop')}
+                onRedeemPromo={redeemPromoCode}
+              />
             )}
 
+            {/* КВЕСТЫ */}
             {openWindows.includes('quests') && (
-              <div key="quests" className={minimizedWindows.includes('quests') ? 'hidden' : 'contents'}>
-                <QuestsWindow
-                  profile={profile}
-                  activeCat={activeCat}
-                  onInteract={handleInteractionClick}
-                  onClaimReward={claimQuestReward}
-                  onClaimMilestone={claimStreakMilestone}
-                  onClose={() => closeWindow('quests')}
-                  onMinimize={() => minimizeWindow('quests')}
-                  initialTab={questsInitialTab}
-                />
-              </div>
+              <QuestsWindow
+                key="quests"
+                profile={currentProfile}
+                activeCat={activeCat}
+                onInteract={handleInteractionClick}
+                onClaimReward={claimQuestReward}
+                onClaimMilestone={claimStreakMilestone}
+                onClose={() => closeWindow('quests')}
+                onMinimize={() => minimizeWindow('quests')}
+                initialTab={questsInitialTab}
+              />
             )}
 
+            {/* АНАЛИТИКА */}
             {openWindows.includes('analytics') && (
-              <div key="analytics" className={minimizedWindows.includes('analytics') ? 'hidden' : 'contents'}>
-                <AnalyticsWindow
-                  profile={profile}
-                  analytics={analytics}
-                  usersList={usersList}
-                  onClose={() => closeWindow('analytics')}
-                  onMinimize={() => minimizeWindow('analytics')}
-                />
-              </div>
+              <AnalyticsWindow
+                key="analytics"
+                profile={currentProfile}
+                analytics={analytics}
+                usersList={usersList}
+                onClose={() => closeWindow('analytics')}
+                onMinimize={() => minimizeWindow('analytics')}
+              />
             )}
 
+            {/* НАСТРОЙКИ */}
             {openWindows.includes('settings') && (
-              <div key="settings" className={minimizedWindows.includes('settings') ? 'hidden' : 'contents'}>
-                <SettingsWindow
-                  profile={profile}
-                  syncing={syncingState}
-                  onSync={handleManualSync}
-                  onUpdateNickname={updateNickname}
-                  onUpdateTheme={updateThemePref}
-                  onClaimReviewReward={claimReviewReward}
-                  isOfflineMode={isOfflineMode}
-                  setIsOfflineMode={setIsOfflineMode}
-                  onClose={() => closeWindow('settings')}
-                  onMinimize={() => minimizeWindow('settings')}
-                />
-              </div>
+              <SettingsWindow
+                key="settings"
+                profile={currentProfile}
+                onUpdateNickname={updateNickname}
+                onUpdateTheme={updateThemePref}
+                onClaimReviewReward={claimReviewReward}
+                isOfflineMode={isOfflineMode}
+                setIsOfflineMode={setIsOfflineMode}
+                onClose={() => closeWindow('settings')}
+                onMinimize={() => minimizeWindow('settings')}
+              />
             )}
 
+            {/* АНТИСТРЕСС */}
             {openWindows.includes('antistress') && (
-              <div key="antistress" className={minimizedWindows.includes('antistress') ? 'hidden' : 'contents'}>
-                <AntistressWindow
-                  profile={profile}
-                  onPopBurst={burstPopIt}
-                  onKeyboardClick={clickKeyboard}
-                  onClose={() => closeWindow('antistress')}
-                  onMinimize={() => minimizeWindow('antistress')}
-                  onAddPaws={(amount) => addPaws(amount, false)}
-                  onAddDiaryEntry={addDiaryEntry}
-                />
-              </div>
+              <AntistressWindow
+                key="antistress"
+                profile={currentProfile}
+                onPopBurst={burstPopIt}
+                onKeyboardClick={clickKeyboard}
+                onClose={() => closeWindow('antistress')}
+                onMinimize={() => minimizeWindow('antistress')}
+                onAddPaws={(amount) => addPaws(amount, false)}
+                onAddDiaryEntry={addDiaryEntry}
+              />
             )}
 
+            {/* МЕССЕНДЖЕР */}
             {openWindows.includes('messenger') && (
-              <div key="messenger" className={minimizedWindows.includes('messenger') ? 'hidden' : 'contents'}>
-                <MessengerWindow
-                  profile={profile}
-                  onClose={() => closeWindow('messenger')}
-                  onMinimize={() => minimizeWindow('messenger')}
-                  onUpdateNickname={updateNickname}
-                  usersList={usersList}
-                  updateProfile={updateProfile}
-                  allSkins={allSkins}
-                />
-              </div>
+              <MessengerWindow
+                key="messenger"
+                profile={currentProfile}
+                activeCat={activeCat}
+                onClose={() => closeWindow('messenger')}
+                onMinimize={() => minimizeWindow('messenger')}
+                onUpdateNickname={updateNickname}
+                usersList={usersList}
+                updateProfile={updateProfile}
+                allSkins={allSkins}
+              />
+            )}
+
+            {/* ГАРДЕРОБ / ШКАФЧИК */}
+            {openWindows.includes('wardrobe') && (
+              <WardrobeWindow
+                key="wardrobe"
+                profile={currentProfile}
+                activeCat={activeCat}
+                allSkins={allSkins}
+                onApply={applySkinOrAccessory}
+                onClose={() => closeWindow('wardrobe')}
+                onMinimize={() => minimizeWindow('wardrobe')}
+                onOpenShop={() => handleOpenWindow('shop')}
+              />
             )}
           </AnimatePresence>
         </div>
@@ -533,49 +460,17 @@ export default function App() {
           usersList={usersList}
           onClose={handleAdminLogout}
           onUpdateUsers={fetchUsersList}
-          currentUser={profile}
-          onBlockUser={async (uid, reason, durationMinutes) => {
-            if (!supabase) return;
-            const u = usersList.find(x => x.id === uid);
-            if (!u) return;
-            const blockedUntil = durationMinutes === -1 ? -1 : Date.now() + durationMinutes * 60 * 1000;
-            const updated = { ...u, blocked: true, blockedReason: reason, blockedUntil: blockedUntil };
-            delete updated.id;
-            await supabase.from('player_profiles').update({ profile_data: updated }).eq('id', uid);
-            fetchUsersList();
-          }}
-          onUnblockUser={async (uid) => {
-            if (!supabase) return;
-            const u = usersList.find(x => x.id === uid);
-            if (!u) return;
-            const updated = { ...u, blocked: false };
-            delete updated.id;
-            await supabase.from('player_profiles').update({ profile_data: updated }).eq('id', uid);
-            fetchUsersList();
-          }}
-          onDeleteUser={async (uid) => {
-            if (!supabase) return;
-            await supabase.from('player_profiles').delete().eq('id', uid);
-            fetchUsersList();
-          }}
-          onMakeAdmin={async (uid) => {
-            if (!supabase) return;
-            const u = usersList.find(x => x.id === uid);
-            if (!u) return;
-            const updated = { ...u, isAdmin: true };
-            delete updated.id;
-            await supabase.from('player_profiles').update({ profile_data: updated }).eq('id', uid);
-            fetchUsersList();
-          }}
-          onChangeBalance={async (uid, amount) => {
-            if (!supabase) return;
-            const u = usersList.find(x => x.id === uid);
-            if (!u) return;
-            const updated = { ...u, paws: amount };
-            delete updated.id;
-            await supabase.from('player_profiles').update({ profile_data: updated }).eq('id', uid);
-            fetchUsersList();
-          }}
+          currentUser={currentProfile}
+          handleBlockUser={handleBlockUser}
+          handleUnblockUser={handleUnblockUser}
+          handleDeleteUser={handleDeleteUser}
+          handleMakeAdmin={handleMakeAdmin}
+          handleChangeBalance={handleChangeBalance}
+          handleSaveNickname={handleSaveNickname}
+          handleBroadcastAnnouncement={handleBroadcastAnnouncement}
+          originalProfile={originalProfile}
+          impersonateUser={impersonateUser}
+          stopImpersonating={stopImpersonating}
         />
       )}
 
@@ -591,21 +486,11 @@ export default function App() {
               onKeyDown={(e) => e.key === 'Enter' && handleAdminPassword((e.target as HTMLInputElement).value)}
             />
             <div className="flex gap-2">
-              <button
-                onClick={() => { setShowAdminPrompt(false); }}
-                className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm hover:bg-white/10 transition"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={() => {
-                  const input = document.querySelector('input[type="password"]') as HTMLInputElement;
-                  handleAdminPassword(input.value);
-                }}
-                className="flex-1 py-2 rounded-xl bg-sky-500 text-white text-sm font-bold hover:bg-sky-600 transition"
-              >
-                Войти
-              </button>
+              <button onClick={() => setShowAdminPrompt(false)} className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm hover:bg-white/10 transition">Отмена</button>
+              <button onClick={() => {
+                const input = document.querySelector('input[type="password"]') as HTMLInputElement;
+                handleAdminPassword(input.value);
+              }} className="flex-1 py-2 rounded-xl bg-sky-500 text-white text-sm font-bold hover:bg-sky-600 transition">Войти</button>
             </div>
           </div>
         </div>
@@ -614,9 +499,9 @@ export default function App() {
       <AdminDashboardModal
         isOpen={showAdminDashboard}
         onClose={() => setShowAdminDashboard(false)}
-        profile={profile}
+        profile={currentProfile}
         isOnline={isOnline}
-        syncing={syncingState}
+        syncing={syncing}
         isAdminMode={isAdminMode}
         onOpenAdminPanel={() => setIsAdminMode(true)}
         onOpenLoginPrompt={() => setShowAdminPrompt(true)}
@@ -628,7 +513,7 @@ export default function App() {
             <div className="text-center space-y-1.5">
               <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-2xl animate-bounce">⚠️</div>
               <h2 className="text-lg font-bold text-white">Разрешение конфликта синхронизации</h2>
-              <p className="text-xs text-slate-400">Обнаружена рассинхронизация прогресса. Вероятно, вы играли с другого устройства. Пожалуйста, выберите способ слияния.</p>
+              <p className="text-xs text-slate-400">Обнаружена рассинхронизация прогресса. Выберите способ слияния.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-3.5 bg-white/5 border border-white/5 rounded-2xl space-y-1 text-left">
@@ -669,7 +554,7 @@ export default function App() {
       <CarePackPopover
         isOpen={careCategory !== null}
         category={careCategory}
-        profile={profile}
+        profile={currentProfile}
         activeCat={activeCat}
         onClose={() => setCareCategory(null)}
         onUseItem={interactWithCat}

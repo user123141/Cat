@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { PlayerProfile, GameAnalytics } from '../types';
 import { X, TrendingUp, Users, Clock, Flame, Award, Sparkles, LayoutGrid, Trophy, Lock, CheckCircle2 } from 'lucide-react';
 import { MacCatWindowFrame } from './MacCatWindowFrame';
+import { triggerHapticLight } from '../utils/audio';
 
 interface AnalyticsWindowProps {
   profile: PlayerProfile | null;
@@ -20,6 +21,7 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
   usersList = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'leaderboard'>('stats');
+  const [leaderboardSort, setLeaderboardSort] = useState<'paws' | 'level'>('paws');
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
@@ -108,7 +110,15 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
 
   // Сортировка пользователей для топа
   const sortedUsers = [...usersList]
-    .sort((a, b) => (b.paws || 0) - (a.paws || 0))
+    .sort((a, b) => {
+      if (leaderboardSort === 'paws') {
+        return (b.paws || 0) - (a.paws || 0);
+      } else {
+        const maxLevelA = (a.cats || []).reduce((max: number, c: any) => Math.max(max, c.level || 1), 1);
+        const maxLevelB = (b.cats || []).reduce((max: number, c: any) => Math.max(max, c.level || 1), 1);
+        return maxLevelB - maxLevelA;
+      }
+    })
     .slice(0, 10); // топ-10
 
   return (
@@ -119,9 +129,16 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
       title="Аналитика и Достижения"
       subtitle="Аналитика"
       headerRight={
-        <div className="text-xs font-mono bg-emerald-500/10 border border-emerald-400/20 text-emerald-400 px-3 py-1 rounded-full flex items-center gap-1.5 shrink-0">
-          <TrendingUp size={11} />
-          <span className="text-[11px]">Удержание: {analytics.retentionScore}%</span>
+        <div className="text-xs font-mono bg-white/5 border border-white/5 px-3 py-1 rounded-full flex items-center gap-1.5 shrink-0 text-slate-300">
+          <span>Made with</span>
+          <motion.span
+            animate={{ scale: [1, 1.25, 1] }}
+            transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+            className="inline-block"
+          >
+            ❤️
+          </motion.span>
+          <span>by Maksym Skorina</span>
         </div>
       }
     >
@@ -217,86 +234,48 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Распределение заботы</h3>
-                    <p className="text-[10px] text-slate-500">Какие потребности питомца вы удовлетворяете чаще</p>
-                  </div>
-                  <div className="space-y-2.5 pt-1">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                        <span>🐟 Кормление</span>
-                        <span>{feedCount} раз</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
-                        <div className="h-full rounded-full bg-orange-500" style={{ width: `${(feedCount / maxVal) * 100}%` }} />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                        <span>🎾 Игры</span>
-                        <span>{playCount} раз</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
-                        <div className="h-full rounded-full bg-rose-500" style={{ width: `${(playCount / maxVal) * 100}%` }} />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                        <span>🧼 Гигиена</span>
-                        <span>{cleanCount} раз</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
-                        <div className="h-full rounded-full bg-blue-500" style={{ width: `${(cleanCount / maxVal) * 100}%` }} />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                        <span>🛌 Отдых</span>
-                        <span>{sleepCount} раз</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
-                        <div className="h-full rounded-full bg-indigo-500" style={{ width: `${(sleepCount / maxVal) * 100}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-indigo-500/10 to-sky-500/5 border border-white/10 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden group">
-                  <div className="absolute -top-12 -right-12 w-32 h-32 bg-sky-500/10 rounded-full filter blur-xl group-hover:bg-sky-500/20 transition-all duration-700" />
-                  <div className="space-y-1.5">
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-sky-500/20 border border-sky-400/20 rounded-full text-[8px] font-bold text-sky-400 uppercase tracking-widest">
-                      <Sparkles size={9} />
-                      <span>CHIEF UI/UX ARCHITECT</span>
-                    </div>
-                    <h3 className="text-md font-bold text-white">Maksym Skorina</h3>
-                    <p className="text-[11px] text-slate-400 leading-normal max-w-sm">
-                      Главный дизайнер интерфейса, автор концепции швейцарского минимализма и глубокого стекломорфизма. Спроектировал идеальный Dock и плавные транзиты в стиле macOS.
-                    </p>
-                  </div>
-                  <div className="border-t border-white/5 pt-3 mt-3 flex items-center gap-4 text-[10px]">
-                    <div className="flex flex-col">
-                      <span className="text-[8px] text-slate-500 font-mono">СТУДИЯ</span>
-                      <span className="font-bold text-slate-200">Skorina Designs</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[8px] text-slate-500 font-mono">ТЕХНОЛОГИИ</span>
-                      <span className="font-bold text-slate-200">SwiftUI Concept & React</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 flex flex-col sm:flex-row items-center gap-3 text-xs">
-                <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400 shrink-0">
-                  <LayoutGrid size={16} />
-                </div>
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-3">
                 <div>
-                  <h4 className="font-bold text-white mb-0.5">Умное удержание</h4>
-                  <p className="text-[11px] text-slate-400 leading-normal">
-                    Благодаря интерактивным виджетам на рабочем столе и динамической панели уведомлений Dynamic Island игроки своевременно узнают о нуждах своих котиков. Это делает заботу вовлекающей и ненавязчивой!
-                  </p>
+                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Распределение заботы</h3>
+                  <p className="text-[10px] text-slate-500">Какие потребности питомца вы удовлетворяете чаще</p>
+                </div>
+                <div className="space-y-2.5 pt-1">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>🐟 Кормление</span>
+                      <span>{feedCount} раз</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="h-full rounded-full bg-orange-500" style={{ width: `${(feedCount / maxVal) * 100}%` }} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>🎾 Игры</span>
+                      <span>{playCount} раз</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="h-full rounded-full bg-rose-500" style={{ width: `${(playCount / maxVal) * 100}%` }} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>🧼 Гигиена</span>
+                      <span>{cleanCount} раз</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${(cleanCount / maxVal) * 100}%` }} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>🛌 Отдых</span>
+                      <span>{sleepCount} раз</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="h-full rounded-full bg-indigo-500" style={{ width: `${(sleepCount / maxVal) * 100}%` }} />
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -377,83 +356,224 @@ export const AnalyticsWindow: React.FC<AnalyticsWindowProps> = ({
               transition={{ duration: 0.18 }}
               className="space-y-4 text-left pb-4"
             >
-              <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                <h3 className="text-xs font-black text-white flex items-center gap-1.5 mb-2 uppercase tracking-wide">
-                  👑 Мировой рейтинг приютов Care OS
-                </h3>
-                <p className="text-[10px] text-slate-400 leading-relaxed">
-                  Повышайте уровни котиков, кормите, играйте и накапливайте ценные лапки 🐾, чтобы войти в элитный зал славы игроков.
-                </p>
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-wide">
+                    👑 Мировой рейтинг приютов Care OS
+                  </h3>
+                  <p className="text-[10px] text-slate-400 leading-relaxed max-w-md">
+                    Повышайте уровни котиков, кормите, играйте и накапливайте ценные лапки 🐾, чтобы войти в элитный зал славы игроков.
+                  </p>
+                </div>
+                <div className="flex bg-black/40 border border-white/5 rounded-xl p-0.5 text-[10px] font-bold">
+                  <button
+                    onClick={() => { triggerHapticLight(); setLeaderboardSort('paws'); }}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      leaderboardSort === 'paws'
+                        ? 'bg-rose-500/25 border border-rose-500/20 text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    🐾 По лапкам
+                  </button>
+                  <button
+                    onClick={() => { triggerHapticLight(); setLeaderboardSort('level'); }}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      leaderboardSort === 'level'
+                        ? 'bg-amber-500/25 border border-amber-500/20 text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    ⭐ По уровню котиков
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-2 bg-black/35 rounded-2xl p-3 border border-white/5">
+              <div className="space-y-2 bg-black/35 rounded-2xl p-3 border border-white/5 text-left">
                 {sortedUsers.length > 0 ? (
-                  sortedUsers.map((user, index) => {
-                    const maxPaws = Math.max(1, ...sortedUsers.map(u => u.paws || 0));
-                    const fillPct = Math.min(100, Math.round(((user.paws || 0) / maxPaws) * 100));
-                    const isMe = user.id === profile.id || user.nickname === profile.nickname;
-                    return (
-                      <div
-                        key={user.id || index}
-                        className={`p-3 rounded-xl flex items-center justify-between gap-4 transition-all ${
-                          isMe
-                            ? 'bg-rose-500/15 border border-rose-500/25 text-white shadow-md'
-                            : 'bg-white/5 border border-transparent text-slate-300 hover:bg-white/10'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className={`w-6 h-6 rounded-lg font-mono text-xs font-bold flex items-center justify-center shrink-0 ${
-                            index === 0
-                              ? 'bg-amber-400 text-amber-950 font-black'
-                              : index === 1
-                                ? 'bg-slate-300 text-slate-900'
-                                : index === 2
-                                  ? 'bg-amber-700 text-amber-100'
-                                  : 'bg-white/10 text-slate-400'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <div className="text-lg shrink-0">{user.avatar || '🐱'}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-xs font-bold truncate ${isMe ? 'text-rose-300 font-extrabold' : 'text-slate-100'}`}>
-                                {user.nickname || 'Без имени'}
-                              </span>
-                              {user.id === 'dev' && (
-                                <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[8px] font-bold uppercase tracking-widest px-1 py-0.5 rounded">
-                                  DEV
+                  <>
+                    {sortedUsers.map((user, index) => {
+                      const maxValForFill = leaderboardSort === 'paws'
+                        ? Math.max(1, ...sortedUsers.map(u => u.paws || 0))
+                        : Math.max(1, ...sortedUsers.map(u => (u.cats || []).reduce((max: number, c: any) => Math.max(max, c.level || 1), 1)));
+                      
+                      const currentValForFill = leaderboardSort === 'paws'
+                        ? (user.paws || 0)
+                        : (user.cats || []).reduce((max: number, c: any) => Math.max(max, c.level || 1), 1);
+
+                      const fillPct = Math.min(100, Math.round((currentValForFill / maxValForFill) * 100));
+                      const isMe = user.id === profile.id || user.nickname === profile.nickname;
+                      
+                      const maxCatLevel = (user.cats || []).reduce((max: number, c: any) => Math.max(max, c.level || 1), 1);
+                      const catsCount = user.cats?.length || 0;
+
+                      return (
+                        <div
+                          key={user.id || index}
+                          className={`p-3 rounded-xl flex items-center justify-between gap-4 transition-all ${
+                            isMe
+                              ? 'bg-rose-500/15 border border-rose-500/25 text-white shadow-md'
+                              : 'bg-white/5 border border-transparent text-slate-300 hover:bg-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className={`w-6 h-6 rounded-lg font-mono text-xs font-bold flex items-center justify-center shrink-0 ${
+                              index === 0
+                                ? 'bg-amber-400 text-amber-950 font-black'
+                                : index === 1
+                                  ? 'bg-slate-300 text-slate-900'
+                                  : index === 2
+                                    ? 'bg-amber-700 text-amber-100'
+                                    : 'bg-white/10 text-slate-400'
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div className="text-lg shrink-0">{user.avatar || '🐱'}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className={`text-xs font-bold truncate ${isMe ? 'text-rose-300 font-extrabold' : 'text-slate-100'}`}>
+                                  {user.nickname || 'Без имени'}
                                 </span>
-                              )}
-                              {isMe && (
+                                {user.selectedBadge && (
+                                  <span className="bg-sky-500/10 border border-sky-400/20 text-sky-400 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded">
+                                    🏅 {user.selectedBadge}
+                                  </span>
+                                )}
+                                {user.id === 'dev' && (
+                                  <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[8px] font-bold uppercase tracking-widest px-1 py-0.5 rounded">
+                                    DEV
+                                  </span>
+                                )}
+                                {isMe && (
+                                  <span className="bg-rose-500/20 border border-rose-500/30 text-rose-300 text-[8px] font-bold uppercase tracking-widest px-1 py-0.5 rounded animate-pulse">
+                                    ВЫ
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[9px] text-slate-500 font-mono">Котов: {catsCount}</span>
+                                <span className="text-[9px] text-slate-500 font-mono">•</span>
+                                <span className="text-[9px] text-slate-500 font-mono">Общий уровень: {(user.cats || []).reduce((acc: number, c: any) => acc + (c.level || 1), 0)}</span>
+                              </div>
+                              <div className="w-full h-1 bg-black/40 rounded-full mt-1.5 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    isMe
+                                      ? 'bg-rose-500'
+                                      : index === 0
+                                        ? 'bg-amber-400'
+                                        : 'bg-slate-400'
+                                  }`}
+                                  style={{ width: `${fillPct}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            {leaderboardSort === 'paws' ? (
+                              <>
+                                <span className="text-xs font-black font-mono text-white">🐾 {user.paws || 0}</span>
+                                <span className="text-[8px] text-slate-500 block">лапок</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xs font-black font-mono text-amber-400">⭐ {maxCatLevel}</span>
+                                <span className="text-[8px] text-slate-500 block">уровень</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Active profile row if the current player is not in top 10 */}
+                    {!sortedUsers.some(u => u.id === profile.id || u.nickname === profile.nickname) && (
+                      <div className="mt-3 pt-3 border-t border-white/5">
+                        <div className="p-3 rounded-xl flex items-center justify-between gap-4 bg-rose-500/15 border border-rose-500/25 text-white shadow-md">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="w-6 h-6 rounded-lg font-mono text-xs font-bold flex items-center justify-center shrink-0 bg-white/10 text-slate-400">
+                              #
+                            </div>
+                            <div className="text-lg shrink-0">{profile.avatar || '🐱'}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-xs font-extrabold truncate text-rose-300">
+                                  {profile.nickname || 'Без имени'}
+                                </span>
+                                {profile.selectedBadge && (
+                                  <span className="bg-sky-500/10 border border-sky-400/20 text-sky-400 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded">
+                                    🏅 {profile.selectedBadge}
+                                  </span>
+                                )}
                                 <span className="bg-rose-500/20 border border-rose-500/30 text-rose-300 text-[8px] font-bold uppercase tracking-widest px-1 py-0.5 rounded animate-pulse">
                                   ВЫ
                                 </span>
-                              )}
-                            </div>
-                            <div className="w-full h-1 bg-black/40 rounded-full mt-1.5 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${
-                                  isMe
-                                    ? 'bg-rose-500'
-                                    : index === 0
-                                      ? 'bg-amber-400'
-                                      : 'bg-slate-400'
-                                }`}
-                                style={{ width: `${fillPct}%` }}
-                              />
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[9px] text-slate-500 font-mono">Котов: {profile.cats?.length || 0}</span>
+                                <span className="text-[9px] text-slate-500 font-mono">•</span>
+                                <span className="text-[9px] text-slate-500 font-mono">Общий уровень: {profile.cats?.reduce((acc: number, c: any) => acc + (c.level || 1), 0) || 0}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-xs font-black font-mono text-white">🐾 {user.paws || 0}</span>
-                          <span className="text-[8px] text-slate-500 block">лапок</span>
+                          <div className="text-right shrink-0">
+                            {leaderboardSort === 'paws' ? (
+                              <>
+                                <span className="text-xs font-black font-mono text-white">🐾 {profile.paws || 0}</span>
+                                <span className="text-[8px] text-slate-500 block">лапок</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xs font-black font-mono text-amber-400">⭐ {profile.cats?.reduce((max: number, c: any) => Math.max(max, c.level || 1), 1) || 1}</span>
+                                <span className="text-[8px] text-slate-500 block">уровень</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    );
-                  })
+                    )}
+                  </>
                 ) : (
-                  <div className="text-center text-slate-500 py-6 text-sm">
-                    Загрузка данных рейтинга...
+                  <div className="p-3 rounded-xl flex items-center justify-between gap-4 bg-rose-500/15 border border-rose-500/25 text-white shadow-md">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-6 h-6 rounded-lg font-mono text-xs font-bold flex items-center justify-center shrink-0 bg-white/10 text-slate-400">
+                        #
+                      </div>
+                      <div className="text-lg shrink-0">{profile.avatar || '🐱'}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-extrabold truncate text-rose-300">
+                            {profile.nickname || 'Без имени'}
+                          </span>
+                          {profile.selectedBadge && (
+                            <span className="bg-sky-500/10 border border-sky-400/20 text-sky-400 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded">
+                              🏅 {profile.selectedBadge}
+                            </span>
+                          )}
+                          <span className="bg-rose-500/20 border border-rose-500/30 text-rose-300 text-[8px] font-bold uppercase tracking-widest px-1 py-0.5 rounded animate-pulse">
+                            ВЫ
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[9px] text-slate-500 font-mono">Котов: {profile.cats?.length || 0}</span>
+                          <span className="text-[9px] text-slate-500 font-mono">•</span>
+                          <span className="text-[9px] text-slate-500 font-mono">Общий уровень: {profile.cats?.reduce((acc: number, c: any) => acc + (c.level || 1), 0) || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {leaderboardSort === 'paws' ? (
+                        <>
+                          <span className="text-xs font-black font-mono text-white">🐾 {profile.paws || 0}</span>
+                          <span className="text-[8px] text-slate-500 block">лапок</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xs font-black font-mono text-amber-400">⭐ {profile.cats?.reduce((max: number, c: any) => Math.max(max, c.level || 1), 1) || 1}</span>
+                          <span className="text-[8px] text-slate-500 block">уровень</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

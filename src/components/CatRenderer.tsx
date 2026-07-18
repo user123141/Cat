@@ -1,44 +1,7 @@
 // src/components/CatRenderer.tsx
 import React from 'react';
 import { motion } from 'motion/react';
-import { RenderAccessory } from '../utils/renderAccessories';
-
-const isHat = (val: string) => {
-  const lower = val.toLowerCase();
-  return lower.includes('crown') || lower.includes('корон') ||
-         lower.includes('halo') || lower.includes('нимб') ||
-         lower.includes('santa') || lower.includes('новогод') || lower.includes('санта') ||
-         lower.includes('detective') || lower.includes('шерлок') || lower.includes('детектив') ||
-         lower.includes('party') || lower.includes('празднич') ||
-         lower.includes('wizard') || lower.includes('волшеб') ||
-         lower.includes('top hat') || lower.includes('цилиндр') ||
-         lower.includes('fedora') || lower.includes('федора') ||
-         lower.includes('beanie') || lower.includes('шапк') || lower.includes('шапочк') ||
-         lower.includes('ushanka') || lower.includes('ушанк') ||
-         lower.includes('helmet') || lower.includes('шлем') ||
-         lower.includes('pirate') || lower.includes('пират') ||
-         lower.includes('cowboy') || lower.includes('ковбой') ||
-         lower.includes('hat') || lower.includes('шляп') ||
-         lower.includes('hairpin') || lower.includes('заколк') || lower.includes('star') || lower.includes('звезд') || lower.includes('шпильк');
-};
-
-const isGlasses = (val: string) => {
-  const lower = val.toLowerCase();
-  return lower.includes('glasses') || lower.includes('ochki') || lower.includes('очк') || lower.includes('очки') ||
-         lower.includes('headphones') || lower.includes('naushniki') || lower.includes('наушник') || lower.includes('гарнитур');
-};
-
-const isNeck = (val: string) => {
-  const lower = val.toLowerCase();
-  return lower.includes('collar') || lower.includes('bell') || lower.includes('ошейник') || lower.includes('колокольч') || lower.includes('колокол') ||
-         lower.includes('bow') || lower.includes('ribbon') || lower.includes('bantik') || lower.includes('бант') || lower.includes('бабочк') || lower.includes('бантик') ||
-         lower.includes('scarf') || lower.includes('sharf') || lower.includes('шарф');
-};
-
-const isBoots = (val: string) => {
-  const lower = val.toLowerCase();
-  return lower.includes('boots') || lower.includes('slippers') || lower.includes('tapochki') || lower.includes('sapozhki') || lower.includes('тапочк') || lower.includes('сапожк') || lower.includes('туфл') || lower.includes('ботинк');
-};
+import { RenderAccessory, getAccessoryConfig } from '../utils/renderAccessories';
 
 interface CatRendererProps {
   breed: string;
@@ -182,22 +145,40 @@ export const CatRenderer: React.FC<CatRendererProps> = React.memo(({
     },
   };
 
-  // Check if we have wings to draw in the background layer
-  const activeWings = React.useMemo(() => {
-    if (wings) return wings;
+  // Построение списка надетых аксессуаров с использованием динамической матрицы
+  const equippedAccessories = React.useMemo(() => {
+    const list: { value: string; config: any }[] = [];
+    const addedSlots = new Set<string>();
+
+    const add = (val: string | undefined, explicitSlot?: string) => {
+      if (val && val !== 'none' && val !== 'empty' && val !== 'null' && val.trim() !== '') {
+        const config = getAccessoryConfig(val);
+        const slot = explicitSlot || config.slot;
+        if (!addedSlots.has(slot) || slot === 'accessory') {
+          list.push({ value: val, config: { ...config, slot } });
+          addedSlots.add(slot);
+        }
+      }
+    };
+
+    // Приоритет явным свойствам
+    add(hat, 'hat');
+    add(glasses, 'glasses');
+    add(collar, 'collar');
+    add(scarf, 'scarf');
+    add(boots, 'boots');
+    add(wings, 'wings');
+
+    // Обратная совместимость с общим accessory
     if (accessory) {
-      const lower = accessory.toLowerCase();
-      if (lower.includes('wing') || lower.includes('крыл')) {
-        return accessory;
+      const config = getAccessoryConfig(accessory);
+      if (!addedSlots.has(config.slot)) {
+        add(accessory, config.slot);
       }
     }
-    return null;
-  }, [wings, accessory]);
 
-  const resolvedHat = hat || (accessory && isHat(accessory) ? accessory : undefined);
-  const resolvedGlasses = glasses || (accessory && isGlasses(accessory) ? accessory : undefined);
-  const resolvedNeck = collar || scarf || (accessory && isNeck(accessory) ? accessory : undefined);
-  const resolvedBoots = boots || (accessory && isBoots(accessory) ? accessory : undefined);
+    return list;
+  }, [hat, glasses, collar, scarf, boots, wings, accessory]);
 
   return (
     <div style={{ width: size, height: size }} className={`relative flex items-center justify-center select-none ${className}`}>
@@ -248,11 +229,11 @@ export const CatRenderer: React.FC<CatRendererProps> = React.memo(({
           <ellipse cx="100" cy="175" rx="55" ry="12" fill="rgba(0,0,0,0.06)" />
 
           {/* 🦋 BACKGROUND LAYER ACCESSORIES (WINGS!) */}
-          {activeWings && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={activeWings} scale={scale} isSleeping={isSleeping} />
+          {equippedAccessories.filter(a => a.config.layer < 0).map(a => (
+            <g key={a.value} transform={`translate(${100 + a.config.offsetX}, ${100 + a.config.offsetY}) scale(${scale * a.config.scale})`}>
+              <RenderAccessory value={a.value} isSleeping={isSleeping} skipTransform={true} />
             </g>
-          )}
+          ))}
 
           {/* Tail */}
           <motion.path
@@ -289,18 +270,6 @@ export const CatRenderer: React.FC<CatRendererProps> = React.memo(({
             </>
           )}
 
-          {/* 👢 BOOTS LAYER */}
-          {boots && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={boots} scale={scale} isSleeping={isSleeping} />
-            </g>
-          )}
-          {!boots && resolvedBoots && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={resolvedBoots} scale={scale} isSleeping={isSleeping} />
-            </g>
-          )}
-
           {/* Whiskers / Details */}
           {breed === 'British Shorthair' && (
             <>
@@ -309,23 +278,6 @@ export const CatRenderer: React.FC<CatRendererProps> = React.memo(({
               <path d="M52 145H68" stroke={patternColor} strokeWidth="4" strokeLinecap="round" opacity="0.3" />
               <path d="M132 145H148" stroke={patternColor} strokeWidth="4" strokeLinecap="round" opacity="0.3" />
             </>
-          )}
-
-          {/* 🧣 NECK LAYER */}
-          {collar && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={collar} scale={scale} isSleeping={isSleeping} />
-            </g>
-          )}
-          {scarf && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={scarf} scale={scale} isSleeping={isSleeping} />
-            </g>
-          )}
-          {!collar && !scarf && resolvedNeck && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={resolvedNeck} scale={scale} isSleeping={isSleeping} />
-            </g>
           )}
 
           {/* Head */}
@@ -445,31 +397,15 @@ export const CatRenderer: React.FC<CatRendererProps> = React.memo(({
             <line x1="146" y1="89" x2="172" y2="89" stroke={breed === 'Siamese' ? '#1e293b' : 'rgba(120,120,120,0.45)'} strokeWidth="2" strokeLinecap="round" />
           </>
 
-          {/* 🕶️ GLASSES / HEADPHONES LAYER */}
-          {glasses && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={glasses} scale={scale} isSleeping={isSleeping} />
+          {/* 🎩 FOREGROUND LAYER ACCESSORIES (Sorted by layer >= 0) */}
+          {equippedAccessories.filter(a => a.config.layer >= 0).sort((a, b) => a.config.layer - b.config.layer).map(a => (
+            <g key={a.value} transform={`translate(${100 + a.config.offsetX}, ${100 + a.config.offsetY}) scale(${scale * a.config.scale})`}>
+              <RenderAccessory value={a.value} isSleeping={isSleeping} skipTransform={true} />
             </g>
-          )}
-          {!glasses && resolvedGlasses && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={resolvedGlasses} scale={scale} isSleeping={isSleeping} />
-            </g>
-          )}
-
-          {/* 🎩 HAT LAYER */}
-          {hat && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={hat} scale={scale} isSleeping={isSleeping} />
-            </g>
-          )}
-          {!hat && resolvedHat && (
-            <g transform="translate(100, 100)">
-              <RenderAccessory value={resolvedHat} scale={scale} isSleeping={isSleeping} />
-            </g>
-          )}
+          ))}
         </svg>
       </motion.div>
     </div>
   );
 });
+

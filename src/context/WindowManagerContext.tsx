@@ -1,16 +1,7 @@
 // src/context/WindowManagerContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-export type WindowId = 'cats' | 'shop' | 'quests' | 'analytics' | 'settings' | 'antistress' | 'calendar' | 'messenger';
-
-export const Z_LAYERS = {
-  BACKGROUND: 0,
-  WIDGETS: 10,
-  WINDOW_BASE: 20,
-  WINDOW_FOCUSED: 40,
-  DYNAMIC_ISLAND: 50,
-  MODALS: 100,
-};
+export type WindowId = 'cats' | 'shop' | 'quests' | 'analytics' | 'settings' | 'antistress' | 'calendar' | 'messenger' | 'wardrobe';
 
 interface WindowManagerContextValue {
   openWindows: WindowId[];
@@ -22,6 +13,8 @@ interface WindowManagerContextValue {
   minimizeWindow: (id: WindowId) => void;
   toggleWindow: (id: WindowId) => void;
   getZIndex: (id: WindowId) => number;
+  isMinimizing: boolean;
+  setIsMinimizing: (val: boolean) => void;
 }
 
 const WindowManagerContext = createContext<WindowManagerContextValue | undefined>(undefined);
@@ -31,6 +24,7 @@ export const WindowManagerProvider: React.FC<{ children: ReactNode }> = ({ child
   const [minimizedWindows, setMinimizedWindows] = useState<WindowId[]>([]);
   const [activeWindow, setActiveWindow] = useState<WindowId | null>('cats');
   const [windowOrder, setWindowOrder] = useState<WindowId[]>(['cats']);
+  const [isMinimizing, setIsMinimizing] = useState(false);
 
   const focusWindow = useCallback((id: WindowId) => {
     setActiveWindow(id);
@@ -50,34 +44,26 @@ export const WindowManagerProvider: React.FC<{ children: ReactNode }> = ({ child
     setMinimizedWindows(prev => prev.filter(w => w !== id));
     if (activeWindow === id) {
       const remaining = openWindows.filter(w => w !== id && !minimizedWindows.includes(w));
-      if (remaining.length > 0) {
-        setActiveWindow(remaining[remaining.length - 1]);
-      } else {
-        setActiveWindow(null);
-      }
+      setActiveWindow(remaining.length > 0 ? remaining[remaining.length - 1] : null);
     }
   }, [activeWindow, openWindows, minimizedWindows]);
 
   const minimizeWindow = useCallback((id: WindowId) => {
+    setIsMinimizing(true);
     setMinimizedWindows(prev => prev.includes(id) ? prev : [...prev, id]);
     if (activeWindow === id) {
       const remaining = openWindows.filter(w => w !== id && !minimizedWindows.includes(w));
-      if (remaining.length > 0) {
-        setActiveWindow(remaining[remaining.length - 1]);
-      } else {
-        setActiveWindow(null);
-      }
+      setActiveWindow(remaining.length > 0 ? remaining[remaining.length - 1] : null);
     }
+    setTimeout(() => setIsMinimizing(false), 400);
   }, [activeWindow, openWindows, minimizedWindows]);
 
   const toggleWindow = useCallback((id: WindowId) => {
     if (openWindows.includes(id)) {
       if (minimizedWindows.includes(id)) {
-        // Развернуть
         setMinimizedWindows(prev => prev.filter(w => w !== id));
         focusWindow(id);
       } else {
-        // Свернуть или закрыть? Обычно свернуть
         minimizeWindow(id);
       }
     } else {
@@ -87,13 +73,9 @@ export const WindowManagerProvider: React.FC<{ children: ReactNode }> = ({ child
 
   const getZIndex = useCallback((id: WindowId): number => {
     const index = windowOrder.indexOf(id);
-    if (index === -1) {
-      return Z_LAYERS.WINDOW_BASE;
-    }
-    if (activeWindow === id) {
-      return Z_LAYERS.WINDOW_FOCUSED + windowOrder.length;
-    }
-    return Z_LAYERS.WINDOW_BASE + index;
+    if (index === -1) return 20;
+    if (activeWindow === id) return 40 + windowOrder.length;
+    return 20 + index;
   }, [activeWindow, windowOrder]);
 
   return (
@@ -107,6 +89,8 @@ export const WindowManagerProvider: React.FC<{ children: ReactNode }> = ({ child
       minimizeWindow,
       toggleWindow,
       getZIndex,
+      isMinimizing,
+      setIsMinimizing,
     }}>
       {children}
     </WindowManagerContext.Provider>

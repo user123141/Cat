@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { PlayerProfile } from './types';
 import { GameLogger } from './utils/GameLogger';
 
-const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || import.meta.env?.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.SUPABASE_ANON_KEY || '';
 
 // Safely initialize the Supabase client only if keys are present to prevent startup crashes.
 export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
@@ -41,7 +41,6 @@ export async function saveProfileToSupabase(userId: string, profile: PlayerProfi
       return false;
     }
 
-    GameLogger.log('success', `Прогресс успешно синхронизирован с облаком для ${profile.nickname}!`);
     return true;
   } catch (err: any) {
     console.error('Network or unknown error during save:', err);
@@ -71,7 +70,6 @@ export async function loadProfileFromSupabase(userId: string): Promise<PlayerPro
     }
 
     if (data && data.profile_data) {
-      GameLogger.log('success', 'Прогресс успешно загружен из облачного сохранения.');
       return data.profile_data as PlayerProfile;
     }
 
